@@ -1,0 +1,355 @@
+@import url("./colors.css");
+
+* {
+  font-size: 15px;
+  font-family: "Hack Nerd Font";
+}
+
+window#waybar {
+  all: unset;
+}
+
+.modules-left {
+  padding: 7px;
+  margin: 10px 0px 5px 10px;
+  border-radius: 10px;
+  background: alpha(@background, 0.6);
+  box-shadow: 0px 0px 2px rgba(0, 0, 0, 0.6);
+}
+
+.modules-center {
+  padding: 7px;
+  margin: 10px 0px 5px 0px;
+  border-radius: 10px;
+  background: alpha(@background, 0.6);
+  box-shadow: 0px 0px 2px rgba(0, 0, 0, 0.6);
+}
+
+.modules-right {
+  padding: 7px;
+  margin: 10px 10px 5px 0px;
+  border-radius: 10px;
+  background: alpha(@background, 0.6);
+  box-shadow: 0px 0px 2px rgba(0, 0, 0, 0.6);
+}
+
+tooltip {
+  background: @background;
+  color: @color7;
+}
+
+#clock:hover,
+#custom-pacman:hover,
+#custom-notification:hover,
+#bluetooth:hover,
+#network:hover,
+#battery:hover,
+#cpu:hover,
+#memory:hover,
+#temperature:hover {
+  transition: all 0.3s ease;
+  color: @color9;
+}
+
+#custom-notification {
+  font-family: 'Hack Nerd Font', sans-serif;
+  padding: 0px 12px;
+  transition: all 0.3s ease;
+  color: @color7;
+}
+
+#clock {
+  padding: 0px 5px;
+  color: @color7;
+  transition: all 0.3s ease;
+}
+
+#custom-pacman {
+  padding: 0px 12px;
+  transition: all 0.3s ease;
+  color: @color7;
+}
+
+#window {
+  padding: 0px 12px;
+}
+
+#workspaces {
+  padding: 0px 12px;
+}
+
+#workspaces button {
+  all: unset;
+  padding: 0px 4px;
+  color: alpha(@color9, 0.4);
+  transition: all 0.2s ease;
+}
+
+#workspaces button:hover {
+  color: rgba(0, 0, 0, 0);
+  border: none;
+  text-shadow: 0px 0px 1.5px rgba(0, 0, 0, 0.5);
+  transition: all 1s ease;
+}
+
+#workspaces button.active {
+  color: @color9;
+  border: none;
+  text-shadow: 0px 0px 2px rgba(0, 0, 0, 0.5);
+}
+
+#workspaces button.empty {
+  color: rgba(0, 0, 0, 0);
+  border: none;
+  text-shadow: 0px 0px 1.5px rgba(0, 0, 0, 0.2);
+}
+
+#workspaces button.empty:hover {
+  color: rgba(0, 0, 0, 0);
+  border: none;
+  text-shadow: 0px 0px 1.5px rgba(0, 0, 0, 0.5);
+  transition: all 1s ease;
+}
+
+#workspaces button.empty.active {
+  color: @color9;
+  border: none;
+  text-shadow: 0px 0px 2px rgba(0, 0, 0, 0.5);
+}
+
+#bluetooth {
+  padding: 0px 5px;
+  transition: all 0.3s ease;
+  color: @foreground;
+}
+
+#bluetooth.disabled {
+  color: #d79921;
+}
+
+#network {
+  padding: 0px 5px;
+  transition: all 0.3s ease;
+  color: @foreground;
+}
+
+#network.disabled {
+  color: #d79921;
+}
+
+#power-profiles-daemon {
+  padding: 0px 5px;
+  transition: all 0.3s ease;
+  color: @foreground;
+}
+
+#battery {
+  padding: 0px 5px;
+  transition: all 0.3s ease;
+  color: @foreground;
+}
+
+#battery.charging {
+  color: #26a65b;
+}
+
+#battery.warning:not(.charging) {
+  color: #ffbe61;
+}
+
+#battery.critical:not(.charging) {
+  color: #f53c3c;
+  animation-name: blink;
+  animation-duration: 0.5s;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  animation-direction: alternate;
+}
+
+#group-expand {
+  padding: 0px 5px;
+  transition: all 0.3s ease;
+}
+
+#custom-expand {
+  padding: 0px 5px;
+  color: alpha(@foreground, 1);
+  text-shadow: 0px 0px 2px rgba(0, 0, 0, 0.7);
+  transition: all 0.3s ease;
+}
+
+#custom-expand:hover {
+  color: rgba(255, 255, 255, 0.2);
+  text-shadow: 0px 0px 2px rgba(255, 255, 255, 0.5);
+}
+
+#custom-colorpicker {
+  padding: 0px 5px;
+}
+
+#cpu,
+#memory,
+#temperature {
+  padding: 0px 5px;
+  transition: all 0.3s ease;
+  color: @color7;
+}
+
+#cpu.critical {
+  color: #f53c3c;
+}
+
+#custom-endpoint {
+  color: @color7;
+  text-shadow: 0px 0px 1.5px rgba(0, 0, 0, 1);
+  margin: 0px 12px 0px 2px;
+  font-size: 14pt;
+}
+
+#tray {
+  padding: 0px 5px;
+  transition: all 0.3s ease;
+}
+
+#tray menu * {
+  padding: 0px 5px;
+  transition: all 0.3s ease;
+}
+
+#tray menu separator {
+  padding: 0px 5px;
+  transition: all 0.3s ease;
+}
+
+#waybar.main #custom-spacer,
+#waybar.main #custom-spacer-slash {
+  font-size: 10pt;
+  font-weight: bold;
+  background: transparent;
+  margin: 0px 4px 0px 4px;
+  color: @color3;
+}
+
+#pulseaudio {
+  color: @foreground;
+  padding: 0 4px;
+  border-radius: 8px;
+}
+
+#pulseaudio.sink-muted {
+  color: #d79921;
+}
+
+#pulseaudio.microphone {
+  color: @foreground;
+}
+
+#pulseaudio.microphone.source-muted {
+  color: #d79921;
+}
+
+#pulseaudio-slider {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 0 12px;
+  margin: 0 4px;
+  border-radius: 8px;
+}
+
+#pulseaudio-slider slider {
+  min-width: 0px;
+  background: transparent;
+  box-shadow: none;
+}
+
+#pulseaudio-slider trough {
+  min-width: 100px;
+  border-radius: 4px;
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+#pulseaudio-slider highlight {
+  min-width: 8px;
+  border-radius: 4px;
+}
+
+#privacy {
+  background: rgba(255, 255, 0, 0.1);
+  padding: 0 12px;
+  margin: 0px 0px 0px 8px;
+  border-radius: 8px;
+}
+
+#privacy-item {
+  color: #d79921;
+}
+
+#group-brightness {
+  padding: 0px 5px;
+  transition: all 0.3s ease;
+}
+
+#backlight {
+  color: @foreground;
+  /* background: rgba(255, 255, 255, 0.1); */
+  padding: 0 4px 0px 0px;
+  margin: 0 4px;
+  /* border: solid 2px @foreground; */
+  border-radius: 8px;
+}
+
+#backlight-slider {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 0 12px;
+  margin: 0 4px;
+  border-radius: 8px;
+}
+
+#backlight-slider slider {
+  min-width: 0px;
+  background: transparent;
+  box-shadow: none;
+}
+
+#backlight-slider trough {
+  min-width: 100px;
+  border-radius: 4px;
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+#backlight-slider highlight {
+  min-width: 8px;
+  border-radius: 4px;
+}
+
+#custom-power {
+  padding: 0px 8px;
+  transition: all 0.3s ease;
+  color: @foreground;
+}
+
+#taskbar {
+  background-color: transparent;
+}
+
+#taskbar button {
+  padding: 0px 6px;
+  margin: 0px 4px;
+  transition: all 0.3s ease;
+}
+
+#custom-waysunset {
+  padding: 2px 6px 0px 6px;
+  transition: all 0.3s ease;
+  color: @foreground;
+}
+
+#group-waypick {
+  padding: 0px 5px;
+  transition: all 0.3s ease;
+}
+
+#custom-waypick {
+  padding: 0px 6px;
+  transition: all 0.3s ease;
+  color: @color7;
+}

@@ -1,0 +1,104 @@
+/*
+ * Wofi Modern Theme with Icon Support
+ *
+ * This theme creates a clean, minimalist look with a dark color scheme,
+ * rounded corners, and subtle animations. It now includes styling
+ * for icons to give a more modern, integrated feel.
+ *
+ * All major styling properties have been moved to CSS variables for easy
+ * customization.
+ */
+
+:root {
+    /* Color Palette (inspired by Catppuccin Mocha) */
+    --bg-color: rgba(30, 30, 46, 0.9);
+    --border-color: rgba(137, 180, 250, 0.6);
+    --text-color: #cdd6f4;
+    --input-bg: rgba(49, 50, 68, 0.8);
+    --input-text-color: #a6e3a1;
+    --selected-bg: rgba(88, 102, 126, 0.7);
+    --selected-border: rgba(137, 180, 250, 0.8);
+
+    /* Sizing and Spacing */
+    --border-width: 2px;
+    --border-radius-lg: 12px;
+    --border-radius-md: 8px;
+    --border-radius-sm: 6px;
+    --padding-lg: 10px;
+    --padding-md: 8px;
+    --padding-sm: 5px;
+    --margin-md: 10px;
+    --margin-sm: 2px;
+    --icon-padding: 8px; /* New variable for icon spacing */
+    
+    /* Font */
+    --main-font: "Noto Sans", "Noto Sans CJK JP", sans-serif;
+    --font-size: 16px;
+}
+
+
+/* Main window styling */
+window {
+    background-color: var(--bg-color);
+    border: var(--border-width) solid var(--border-color);
+    border-radius: var(--border-radius-lg);
+    font-family: var(--main-font);
+    color: var(--text-color);
+    font-size: var(--font-size);
+    padding: var(--padding-lg);
+}
+
+/* Input bar styling */
+#input {
+    background-color: var(--input-bg);
+    border: none;
+    padding: var(--padding-lg);
+    border-radius: var(--border-radius-md);
+    color: var(--input-text-color);
+    margin-bottom: var(--margin-md);
+}
+
+/* Scrollbar styling */
+#scroll {
+    /* Hide the scrollbar by default, you can remove this to show it */
+    -wofi-hide-scroll: true;
+}
+
+/* Entry list container */
+#outer-box {
+    margin: 0px;
+    padding: 0px;
+    border: none;
+}
+
+/* Individual entry styling */
+#entry {
+    background-color: transparent;
+    padding: var(--padding-md) var(--padding-lg);
+    margin: var(--margin-sm);
+    border-radius: var(--border-radius-sm);
+    
+    /* New styling for icons */
+    display: flex;
+    align-items: center;
+}
+
+/* Hovered entry styling */
+#entry:selected {
+    background-color: var(--selected-bg);
+    border: 1px solid var(--selected-border);
+    transition: background-color 0.2s ease;
+}
+
+/* Inner box (for images/icons if you use them) */
+#inner-box {
+    margin: 0px;
+    padding: 0px;
+}
+
+/* Text inside entries */
+#text {
+    padding: var(--padding-sm);
+    /* Add padding to the left of the text to make space for the icon */
+    padding-left: var(--icon-padding);
+}

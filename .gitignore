@@ -1,0 +1,9 @@
+hypr/scripts/logs/
+.DS_Store
+
+*.log
+*.bak*
+*.old
+waybar/scripts/waypick_*
+hypr/hyprmoncfg-monitors.lua
+bash/.bashrc.local

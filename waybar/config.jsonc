@@ -1,0 +1,420 @@
+{
+  "output": ["eDP-1", "HDMI-A-1"],
+
+  "layer": "top",
+  "position": "top",
+  "reload_style_on_change": true,
+
+  "modules-left": [
+    "custom/notification",
+    "custom/pacman",
+    // "custom/waypick",
+    "group/waypick",
+    "hyprland/workspaces",
+    "custom/spacer-slash",
+    "hyprland/window",
+    "group/toolbar"
+  ],
+  "modules-center": ["clock"],
+  "modules-right": [
+    "group/expand",
+    "tray",
+    "custom/spacer-slash",
+    "privacy",
+    "custom/waysunset",
+    "pulseaudio#microphone",
+    "group/audio",
+    "bluetooth",
+    "network",
+    "group/brightness",
+    "power-profiles-daemon",
+    "battery",
+    "custom/power"
+  ],
+
+  "hyprland/workspaces": {
+    "format": "{icon}",
+    // "format-icons": {
+    //   "active": "",
+    //   "default": "",
+    //   "empty": ""
+    // },
+    "active-only": false,
+    // "persistent-workspaces": {
+    //   "*": [1, 2]
+    // },
+    "all-outputs": true,
+    "on-scroll-up": "hyprctl dispatch workspace e-1",
+    "on-scroll-down": "hyprctl dispatch workspace e+1"
+  },
+
+  "hyprland/window": {
+    "format": "{title:.15}",
+    "tooltip": true,
+    "tooltip-format": "{title}",
+    "icon": true,
+    "icon-size": 18,
+    "separate-outputs": false
+  },
+
+  "group/toolbar": {
+    "orientation": "horizontal",
+    "drawer": {
+      "transition-duration": 400,
+      "click-to-reveal": false,
+      "children-class": "toolbar"
+    },
+    "modules": [
+      "custom/expand",
+      "wlr/taskbar"
+    ]
+  },
+
+  "wlr/taskbar": {
+    "format": "{icon}",
+    "spacing": 0,
+    "icon-size": 14,
+    "icon-theme": "Numix Circle",
+    "tooltip-format": "{title}",
+    "on-click": "activate",
+    "on-click-middle": "close",
+    "on-click-right": "",
+    "all-outputs": true,
+    "sort-by-app-id": true
+  },
+
+  "custom/notification": {
+    "tooltip": false,
+    "format": "{icon}",
+    "format-icons": {
+      "notification": "<span foreground='red'><sup></sup></span>",
+      "none": "",
+      "inhibited-none": "",
+      "inhibited-notification": "<span foreground='red'><sup></sup></span>",
+      "dnd-none": "",
+      "dnd-notification": "<span foreground='red'><sup></sup></span>",
+      "dnd-inhibited-notification": "<span foreground='red'><sup></sup></span>",
+      "dnd-inhibited-none": ""
+    },
+    "exec-if": "which swaync-client",
+    "exec": "swaync-client -swb",
+    "return-type": "json",
+    "on-click": "swaync-client -t -sw",
+    "on-click-right": "swaync-client -d -sw",
+    "escape": true
+  },
+
+  "privacy": {
+    "icon-size": 12
+  },
+
+  "pulseaudio#microphone": {
+    "format": "{format_source}",
+    "format-source": "<span size='13.5pt' font='Material Icons Outlined'>mic</span>",
+    "format-source-muted": "<span size='13.5pt' font='Material Icons Outlined'>mic_off</span>",
+    "on-click": "pactl set-source-mute @DEFAULT_SOURCE@ toggle",
+    "tooltip": false
+  },
+
+  "group/brightness": {
+    "orientation": "inherit",
+    "drawer": {
+      "transition-duration": 400,
+      "children-class": "brightness",
+      "transition-left-to-right": false,
+      "click-to-reveal": false
+    },
+    "modules": ["backlight", "backlight/slider"]
+  },
+
+  "backlight/slider": {
+    "min": 5,
+    "max": 100,
+    "orientation": "horizontal",
+    "device": "intel_backlight"
+  },
+
+  "backlight": {
+    "device": "intel_backlight",
+    "format": "{icon}",
+    "format-icons": [
+      "<span size='12.5pt' font='Material Icons'>brightness_low</span>",
+      "<span size='12.5pt' font='Material Icons'>brightness_6</span>",
+      "<span size='12.5pt' font='Material Icons'>brightness_high</span>"
+    ],
+    // If you want to use scroll to change brightness, comment the following lines
+    // "on-scroll-up": "",
+    // "on-scroll-down": "",
+    // And Uncomment the following lines
+    "reverse-scrolling": true,
+    "smooth-scrolling-threshold": 0.1,
+    "tooltip": false
+  },
+
+  "group/audio": {
+    "orientation": "inherit",
+    "drawer": {
+      "transition-duration": 400,
+      "children-class": "audio",
+      "transition-left-to-right": false,
+      "click-to-reveal": false
+    },
+    "modules": ["pulseaudio", "pulseaudio/slider"]
+  },
+
+  "pulseaudio/slider": {
+    "min": 0,
+    "max": 100,
+    "orientation": "horizontal"
+  },
+
+  "pulseaudio": {
+    "interval": 1,
+    "format": "{icon}",
+    "format-muted": "<span size='14pt' font='Material Icons'>volume_off</span>",
+    "format-icons": {
+      "headphone": "<span size='14pt' font='Material Icons'>headphones</span>",
+      // For my Airpods Pro (find your device name with `pactl list sinks`)
+      "bluez_output.70_AE_D5_BA_99_AB.1": "󱡏",
+      "hands-free": "<span size='14pt' font='Material Icons'>headset_mic</span>",
+      "headset": "<span size='14pt' font='Material Icons'>headphones</span>",
+      "headset-muted": "<span size='14pt' font='Material Icons'>headset_off</span>",
+      "default": [
+        "<span size='14pt' font='Material Icons'>volume_mute</span>",
+        "<span size='14pt' font='Material Icons'>volume_down</span>",
+        "<span size='14pt' font='Material Icons'>volume_up</span>"
+      ]
+    },
+    "on-click-right": "pavucontrol",
+    "on-click": "pactl set-sink-mute @DEFAULT_SINK@ toggle",
+    "on-scroll-up": "pactl set-sink-volume @DEFAULT_SINK@ +5%",
+    "on-scroll-down": "pactl set-sink-volume @DEFAULT_SINK@ -5%",
+    "tooltip": true,
+    "tooltip-format": "Volume: {volume}%\n{desc}",
+    "ignored-sinks": ["Easy Effects Sink"]
+  },
+
+  "clock": {
+    "format": "{:%I:%M:%S %p} ",
+    "interval": 1,
+    "tooltip-format": "<tt>{calendar}</tt>",
+    "calendar": {
+      "format": {
+        "today": "<span color='#fAfBfC'><b>{}</b></span>"
+      }
+    },
+    "actions": {
+      "on-click-right": "shift_down",
+      "on-click": "shift_up"
+    }
+  },
+
+  "network": {
+    "format-icons": {
+      "wifi": [
+        "<span size='12pt' font='Material Icons Outlined'>wifi_1_bar</span>",
+        "<span size='12pt' font='Material Icons Outlined'>wifi_2_bar</span>",
+        "<span size='12pt' font='Material Icons Outlined'>wifi</span>"
+      ],
+      "ethernet": "<span size='12pt' font='Material Icons Outlined'>lan</span>",
+      "disabled": "<span size='12pt' font='Material Icons Outlined'>wifi_off</span>",
+      "disconnected": "<span size='12pt' font='Material Icons Outlined'>signal_wifi_bad</span>"
+    },
+    "format-wifi": "{icon}",
+    "format-ethernet": "{icon} Wired",
+    "format-disconnected": "{icon}",
+    "format-disabled": "{icon}",
+    "interval": 5,
+    "on-click": "rfkill toggle wifi",
+    "on-click-right": "kitty -e nmtui",
+    "tooltip": true,
+    "tooltip-format-wifi": "{essid}\t{gwaddr}\n{bandwidthUpBytes} <span size='12pt' font='Material Icons Outlined'>keyboard_arrow_up</span> \t{bandwidthDownBytes} <span size='12pt' font='Material Icons Outlined'>keyboard_arrow_down</span>",
+    "tooltip-format-ethernet": "{ifname} 🖧 ",
+    "max-length": 20
+  },
+
+  "bluetooth": {
+    "interval": 5,
+    "format-on": "<span size='14pt' font='Material Icons Outlined'></span>",
+    "format-off": "<span size='14pt' font='Material Icons Outlined'>bluetooth_disabled</span>",
+    "format-disabled": "<span size='14pt' font='Material Icons Outlined'>bluetooth_disabled</span>",
+    "format-connected": "<span size='14pt' font='Material Icons Outlined'>bluetooth_connected</span>",
+    "format-connected-battery": "{device_battery_percentage}% <span size='14pt' font='Material Icons Outlined'>bluetooth_connected</span>",
+    "tooltip-format": "{controller_alias}\t{controller_address}\n\n{num_connections} connected",
+    "tooltip-format-connected": "{controller_alias}\t{controller_address}\n\n{num_connections} connected\n\n{device_enumerate}",
+    "tooltip-format-enumerate-connected": "{device_alias}\n{device_address}",
+    "tooltip-format-enumerate-connected-battery": "{device_alias}\n{device_address}\n{device_battery_percentage}%",
+    "on-click": "rfkill toggle bluetooth",
+    "on-click-right": "blueman-manager"
+  },
+
+  "battery": {
+    "interval": 10,
+    "states": {
+      "good": 95,
+      "warning": 30,
+      "critical": 20
+    },
+    "format": "{capacity}% {icon}",
+    "format-charging": "{capacity}% <span size='14pt' font='Material Icons Outlined'>bolt</span>",
+    "format-plugged": "{capacity}% <span size='14pt' font='Material Icons Outlined'>cable</span>",
+    "format-icons": [
+      "<span font='Material Icons Outlined'>battery_0_bar</span>",
+      "<span font='Material Icons Outlined'>battery_1_bar</span>",
+      "<span font='Material Icons Outlined'>battery_2_bar</span>",
+      "<span font='Material Icons Outlined'>battery_3_bar</span>",
+      "<span font='Material Icons Outlined'>battery_4_bar</span>",
+      "<span font='Material Icons Outlined'>battery_5_bar</span>",
+      "<span font='Material Icons Outlined'>battery_6_bar</span>",
+      "<span font='Material Icons Outlined'>battery_full</span>"
+    ],
+    "tooltip": true,
+    "tooltip-format": "Capacity: {capacity}%\nETA/State: {timeTo}\nHealth: {health}%"
+  },
+
+  "power-profiles-daemon": {
+    "format": "{icon}",
+    "tooltip": true,
+    "format-icons": {
+      "performance": "<span size='12pt' font='Material Icons'>local_fire_department</span>",
+      "balanced": "<span size='12pt' font='Material Icons'>balance</span>",
+      "power-saver": "<span size='12pt' font='Material Icons'>eco</span>"
+    }
+  },
+
+  "custom/pacman": {
+    "format": "󰣇 {}",
+    "interval": 30,
+    "exec": "checkupdates | wc -l",
+    "on-click": "kitty --title 'SystemUpdater' sh -c 'yay -Syu; echo Done - Press enter to exit; read'; pkill -SIGRTMIN+8 waybar",
+    "signal": 8,
+    "tooltip": true,
+    "format-tooltip": "Update system"
+  },
+
+  "group/expand": {
+    "orientation": "horizontal",
+    "drawer": {
+      "transition-duration": 600,
+      "transition-to-left": true,
+      "click-to-reveal": true
+    },
+    "modules": [
+      "custom/expand",
+      "cpu",
+      "memory",
+      "temperature",
+      "custom/endpoint"
+    ]
+  },
+
+  "custom/expand": {
+    "format": "<span size='14pt' font='Material Icons Outlined'>code</span>",
+    "tooltip": true,
+    "tooltip-format": "Expand",
+    "on-scroll-up": "",
+    "on-scroll-down": ""
+  },
+
+  "custom/endpoint": {
+    "format": "|",
+    "tooltip": false,
+    "on-scroll-up": "",
+    "on-scroll-down": ""
+  },
+
+  "cpu": {
+    "interval": 3,
+    "format": "<span size='14pt' font='Material Icons Outlined'>memory</span>",
+    "tooltip": true,
+    "tooltip-format": "CPU Frequency: {avg_frequency} GHz\nCPU Usage: {cpu_usage}%",
+    "states": {
+      "critical": 85
+    },
+    "on-scroll-up": "",
+    "on-scroll-down": "",
+    "on-click": "kitty -e btm"
+  },
+
+  "memory": {
+    "interval": 3,
+    "format": "<span size='14pt' font='Material Icons Outlined'>storage</span>",
+    "tooltip": true,
+    "tooltip-format": "RAM: {used}/{total}GB ({percentage}%)\nSwap: {swapUsed}/{swapTotal}GB ({swapPercentage}%)",
+    "on-scroll-up": "",
+    "on-scroll-down": "",
+    "on-click": "kitty -e btm"
+  },
+
+  "temperature": {
+    "format": "<span size='14pt' font='Material Icons Outlined'>device_thermostat</span>",
+    "critical-threshold": 80,
+    "on-scroll-up": "",
+    "on-scroll-down": "",
+    "on-click": "kitty -e btm"
+  },
+
+  "tray": {
+    "icon-size": 14,
+    "spacing": 10
+  },
+
+  "custom/spacer-slash": {
+    "format": " // ",
+    "tooltip": false
+  },
+
+  "custom/power": {
+    "format": "<span size='14pt' font='Material Icons'>power_settings_new</span>",
+    "on-click": "wlogout --protocol layer-shell --buttons-per-row 5",
+    "tooltip": false
+  },
+
+  "group/waypick": {
+    "signal": 9,
+    "orientation": "inherit",
+    "drawer": {
+      "transition-duration": 400,
+      "children-class": "audio",
+      "transition-left-to-right": true,
+      "click-to-reveal": false
+    },
+    "modules": ["custom/waypick-icon", "custom/waypick"]
+  },
+
+  "custom/waypick-icon": {
+    "signal": 9,
+    "format": "{}",
+    "return-type": "json",
+    "exec": "$HOME/.config/waybar/scripts/waypick.sh icon",
+    "tooltip": true,
+    "format-tooltip": "Pick color\nLeft Click: Pick color\nRight Click: Copy last picked color",
+    "interval": "once",
+    "on-click": "$HOME/.config/waybar/scripts/waypick.sh pick && pkill -RTMIN+9 waybar",
+    "on-click-right": "$HOME/.config/waybar/scripts/waypick.sh copy"
+  },
+
+  "custom/waypick": {
+    "signal": 9,
+    "format": "{}",
+    "return-type": "json",
+    "interval": "once",
+    "exec": "$HOME/.config/waybar/scripts/waypick.sh",
+    "on-click": "$HOME/.config/waybar/scripts/waypick.sh pick && pkill -RTMIN+9 waybar",
+    "on-click-right": "$HOME/.config/waybar/scripts/waypick.sh copy",
+    "tooltip": true,
+    "escape": false
+  },
+
+  "custom/waysunset": {
+    "format": "{}",
+    "return-type": "json",
+    "interval": "once",
+    "exec": "$HOME/.config/waybar/scripts/waysunset.sh",
+    "on-click": "$HOME/.config/waybar/scripts/waysunset.sh toggle && sleep 0.5 && pkill -RTMIN+11 waybar",
+    "on-click-right": "",
+    "signal": 11,
+    "tooltip": true,
+    "escape": false
+  }
+}

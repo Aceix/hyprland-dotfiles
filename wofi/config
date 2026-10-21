@@ -1,0 +1,63 @@
+#
+# Wofi Configuration File
+#
+# This file contains key-value pairs to customize Wofi's behavior.
+# It is designed to work well with the CSS theme we've been creating.
+#
+# Place this file in: ~/.config/wofi/config
+#
+
+# General Options
+# ==================================
+
+# The mode(s) to use, separated by commas.
+# 'drun' lists desktop application entries.
+# 'run' lists executables in your $PATH.
+# 'dmenu' is for scripting.
+mode=drun,run
+
+# Width of the Wofi window. Use '%' for a percentage of the screen width.
+width=40%
+
+# Height of the Wofi window in pixels. A fixed height is often cleaner.
+height=400
+
+# Specifies the number of columns to display entries.
+# '1' is the standard single-column layout.
+columns=2
+
+# Position of the Wofi window. Common options are 'center' (default),
+# 'top', 'bottom', 'top_left', etc.
+location=center
+
+# Styling and Appearance
+# ==================================
+
+# Path to the CSS stylesheet. Wofi will automatically load a file
+# named `style.css` in the same directory, but you can explicitly
+# define it here.
+style=style.css
+
+# If true, Wofi will display icons for applications in 'drun' mode.
+# This is essential for a modern, visual-first launcher.
+allow_images=true
+
+# Specifies the size of the icons in pixels.
+image_size=32
+
+# If true, hides the scrollbar for a cleaner, minimalist look.
+# Use the mouse wheel or arrow keys to scroll.
+hide_scroll=true
+
+# User Experience
+# ==================================
+
+# The text to display as a prompt in the input field.
+prompt=Find...
+
+# If true, matching will be case-insensitive, which is better for usability.
+insensitive=true
+
+# The rate at which search results are updated in milliseconds.
+# A lower value (e.g., 50) makes the filtering feel snappier.
+filter_rate=50

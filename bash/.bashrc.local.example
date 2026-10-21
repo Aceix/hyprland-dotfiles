@@ -1,0 +1,5 @@
+# Copy to ~/.bashrc.local; it's sourced at the end of ~/.bashrc and never committed.
+
+# alias claude='sbx run claude'
+# export MY_SERVER=203.0.113.10
+# export SOME_API_KEY=...
