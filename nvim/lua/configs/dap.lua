@@ -42,107 +42,10 @@ return function()
     },
   }
 
-  -- JS/TS (Node, Next/Nuxt server, and browser code for Vue/React/Svelte/
-  -- Angular) via vscode-js-debug. mason-nvim-dap doesn't map it, so by hand.
+  -- JS/TS: Node, and web apps in a browser, offered by project (utils/js_debug.lua)
   local js_debug = vim.fn.exepath "js-debug-adapter"
   if js_debug ~= "" then
-    for _, adapter in ipairs { "pwa-node", "pwa-chrome" } do
-      dap.adapters[adapter] = {
-        type = "server",
-        host = "localhost",
-        port = "${port}",
-        executable = { command = js_debug, args = { "${port}" } },
-      }
-    end
-
-    -- Dev server URL guessed from package.json, still editable in the prompt
-    local function dev_url()
-      local port = "5173" -- Vite (Vue, Svelte, React)
-      local ok, pkg = pcall(function()
-        return vim.json.decode(table.concat(vim.fn.readfile(vim.fn.getcwd() .. "/package.json"), "\n"))
-      end)
-      if ok and type(pkg) == "table" then
-        local deps = vim.tbl_extend("force", pkg.dependencies or {}, pkg.devDependencies or {})
-        if deps["@angular/core"] then
-          port = "4200"
-        elseif deps.next or deps.nuxt then
-          port = "3000"
-        end
-      end
-      return vim.fn.input("URL: ", "http://localhost:" .. port)
-    end
-
-    local skip = { "<node_internals>/**", "**/node_modules/**" }
-    local node_configs = {
-      {
-        type = "pwa-node",
-        request = "launch",
-        name = "Node: launch current file",
-        program = "${file}",
-        cwd = "${workspaceFolder}",
-        sourceMaps = true,
-        skipFiles = skip,
-        console = "integratedTerminal",
-      },
-      {
-        -- Next/Nuxt SSR + API routes: js-debug follows the child processes
-        -- `npm run dev` spawns, so server-side breakpoints just bind.
-        type = "pwa-node",
-        request = "launch",
-        name = "Node: npm run dev (server-side)",
-        runtimeExecutable = "npm",
-        runtimeArgs = { "run", "dev" },
-        cwd = "${workspaceFolder}",
-        autoAttachChildProcesses = true,
-        sourceMaps = true,
-        skipFiles = skip,
-        console = "integratedTerminal",
-      },
-      {
-        type = "pwa-node",
-        request = "attach",
-        name = "Node: attach to process (--inspect)",
-        processId = require("dap.utils").pick_process,
-        cwd = "${workspaceFolder}",
-        sourceMaps = true,
-        skipFiles = skip,
-      },
-    }
-    -- webpack paths (Angular CLI, Next client bundles) back to real files
-    local webpack_overrides = {
-      ["webpack:///./*"] = "${webRoot}/*",
-      ["webpack:///src/*"] = "${webRoot}/src/*",
-      ["webpack:///*"] = "*",
-    }
-    local chrome_configs = {
-      {
-        type = "pwa-chrome",
-        request = "launch",
-        name = "Chrome: launch dev server URL",
-        url = dev_url,
-        webRoot = "${workspaceFolder}",
-        sourceMaps = true,
-        sourceMapPathOverrides = webpack_overrides,
-        resolveSourceMapLocations = { "${workspaceFolder}/**", "!**/node_modules/**" },
-        userDataDir = false,
-      },
-      {
-        type = "pwa-chrome",
-        request = "attach",
-        name = "Chrome: attach (--remote-debugging-port=9222)",
-        port = 9222,
-        webRoot = "${workspaceFolder}",
-        sourceMaps = true,
-        sourceMapPathOverrides = webpack_overrides,
-      },
-    }
-
-    for _, ft in ipairs { "javascript", "typescript" } do
-      dap.configurations[ft] = vim.list_extend(vim.deepcopy(node_configs), chrome_configs)
-    end
-    for _, ft in ipairs { "javascriptreact", "typescriptreact", "vue", "svelte" } do
-      dap.configurations[ft] = vim.list_extend(vim.deepcopy(chrome_configs), node_configs)
-    end
+    require("utils.js_debug").setup(js_debug)
   end
 
   -- .vscode/launch.json is read by nvim-dap on its own; these make the
@@ -166,11 +69,6 @@ return function()
   alias("node", "pwa-node")
   alias("chrome", "pwa-chrome")
   alias("go", "delve")
-
-  local vscode = require "dap.ext.vscode"
-  for _, t in ipairs { "node", "pwa-node", "chrome", "pwa-chrome" } do
-    vscode.type_to_filetypes[t] = require("utils.deps").js_fts
-  end
 
   -- NASM through gdb's built-in DAP mode (gdb 14+). Assemble with
   -- `nasm -f elf64 -g -F dwarf` so line breakpoints have something to bind to.

@@ -6,7 +6,7 @@
 local M = {}
 
 M.base46 = {
-	theme = "dark_horizon",
+	theme = "scaryforest",
   transparency = true,
 
   -- neotest isn't in base46's default set; loading it themes the test
