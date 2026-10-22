@@ -18,7 +18,7 @@ map("n", "<S-Tab>", "<Nop>", { desc = "Nothing (VS Code)" })
 map("v", "<Tab>", ">gv", { desc = "Indent selection right" })
 map("v", "<S-Tab>", "<gv", { desc = "Indent selection left" })
 
-map("n", "<leader>uz", "<cmd>ZenMode<cr>", { desc = "Toggle Zen Mode" })
+map("n", "<leader>uz", call("utils.diff_zen", "toggle"), { desc = "Toggle Zen Mode" })
 
 -- === VS Code-style selection & word motion ================================
 -- Plain <S-arrow> keys are intentionally NOT mapped here: Neovim's built-in

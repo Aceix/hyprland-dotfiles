@@ -1,69 +1,98 @@
+-- Twilight lights up only the innermost block around the cursor (if/else,
+-- loop, try, function, method, class, table/object literal, ...), found with
+-- tree-sitter, however long it is. Where there's no block (top-level code, no
+-- parser for the filetype) it's exactly RADIUS lines either side.
+--
+-- Upstream's context instead grows to the outermost node of a few literal
+-- types ("function", "if_statement", ...) that most parsers don't use, or
+-- else to ~10 lines snapped to blank lines. It also crashed on Neovim 0.12+,
+-- where get_parser() returns nil rather than erroring for filetypes without
+-- a parser (folke/twilight.nvim#54); here that's just the no-block case.
+local RADIUS = 10
+
+-- A node is a block when one of the _-separated words of its type is one of
+-- these: if_statement, for_in_statement, arrow_function, method_definition,
+-- table_constructor, closure_expression, impl_item, func_literal, ...
+-- (elseif/elif/else branches aren't, so a whole if lights up)
+local BLOCK = {}
+for _, word in ipairs {
+  "function", "func", "method", "constructor", "lambda", "closure",
+  "class", "struct", "enum", "interface", "trait", "impl", "module", "namespace",
+  "if", "unless", "for", "while", "until", "loop", "repeat", "do", "with",
+  "try", "catch", "except", "switch", "select", "match", "when", "case",
+  "table", "object", "array", "dictionary", "list",
+} do
+  BLOCK[word] = true
+end
+-- ...and none of these: a function_call or parameter list over several lines
+-- isn't a block
+local NOT_BLOCK = { call = true, invocation = true, arguments = true, parameters = true, signature = true }
+
+local function is_block(type)
+  local block = false
+  for word in type:gmatch "[^_]+" do
+    if NOT_BLOCK[word] then
+      return false
+    end
+    block = block or BLOCK[word] == true
+  end
+  return block
+end
+
+-- 0-based first and last line of the innermost block around col that spans
+-- more than the line itself. Injected code (a fenced block in markdown, ...)
+-- is searched first, then the language around it.
+local function block_at(parser, line, col)
+  local range = { line, col, line, col }
+  local tree = parser:language_for_range(range)
+  while tree do
+    local node = tree:named_node_for_range(range, { ignore_injections = true })
+    while node do
+      local from, _, to, to_col = node:range()
+      if to_col == 0 and to > from then
+        to = to - 1 -- ends at the start of the next line
+      end
+      if to > from and is_block(node:type()) then
+        return from, to
+      end
+      node = node:parent()
+    end
+    tree = tree:parent()
+  end
+end
+
+-- The innermost block seen from the line's first or last character, so a
+-- block's opening line (`local t = {`, `if x then`) and closing line (`})`,
+-- `end`) both light up that block
+local function block_range(buf, line)
+  local ok, parser = pcall(vim.treesitter.get_parser, buf)
+  if not (ok and parser) then
+    return
+  end
+  local text = vim.api.nvim_buf_get_lines(buf, line, line + 1, false)[1] or ""
+  parser:parse { line, line + 1 }
+  local first = math.max(0, (text:find "%S" or 1) - 1)
+  local last = math.max(0, (text:find "%S%s*$" or 1) - 1)
+  local from, to = block_at(parser, line, first)
+  if last ~= first then
+    local lfrom, lto = block_at(parser, line, last)
+    if lfrom and (not from or lto - lfrom < to - from) then
+      from, to = lfrom, lto
+    end
+  end
+  return from, to
+end
+
 return function(_, opts)
   require("twilight").setup(opts)
 
-  -- Upstream bug (folke/twilight.nvim#54, fix not yet merged): on Neovim
-  -- 0.12+, vim.treesitter.get_parser() returns nil instead of erroring
-  -- for filetypes with no installed parser. get_context()'s guard here
-  -- only checked that the call didn't error (pcall ok), not that it
-  -- actually got a parser, so it stayed on the treesitter path with a
-  -- nil parser: get_node() crashed on CursorMoved, and once patched to
-  -- no-op instead, context collapsed to just the current line because
-  -- the intended fallback (a +/- context/2 line window expanded to
-  -- blank-line boundaries, below) was unreachable. Checking `parser`
-  -- itself (matching upstream PR #55) restores that fallback for
-  -- parser-less filetypes while leaving unaffected filetypes that do
-  -- have a parser installed, which still get full block/function nodes.
-  local view = require "twilight.view"
-  local config = require "twilight.config"
-
-  view.get_context = function(buf, line)
-    local ok, parser = pcall(vim.treesitter.get_parser, buf)
-    if config.options.treesitter and ok and parser then
-      local node = view.get_node(buf, line)
-      local root = view.get_expand_root(node)
-      if root then
-        local from, to = view.range(root)
-        return from + 1, to + 2
-      end
-      local from, to = view.expand(buf, line, line, line)
-
-      while to - from < config.options.context do
-        local pf, pt, pnode = view.expand(buf, from, to, from - 1)
-        local nf, nt, nnode = view.expand(buf, from, to, to + 1)
-
-        local mp = math.max(line - pf, pt - line)
-        local mn = math.max(line - nf, nt - line)
-
-        if (mp < mn) and not (from == pf and to == pt) then
-          from = pf
-          to = pt
-          if pnode and view.get_expand_root(pnode) then break end
-        elseif not (from == nf and to == nt) then
-          from = nf
-          to = nt
-          if nnode and view.get_expand_root(nnode) then break end
-        else
-          break
-        end
-      end
-
-      return from + 1, to + 2
+  -- line: 0-based cursor line. Returns the lit lines as 1-based [from, to).
+  require("twilight.view").get_context = function(buf, line)
+    local from, to = block_range(buf, line)
+    if not from then
+      from = math.max(0, line - RADIUS)
+      to = math.min(vim.api.nvim_buf_line_count(buf) - 1, line + RADIUS)
     end
-
-    local from = line - math.floor(config.options.context / 2)
-    local to = line + math.floor(config.options.context / 2)
-
-    local lcount = vim.api.nvim_buf_line_count(buf)
-    if to > lcount then to = lcount end
-    if from < 1 then from = 1 end
-
-    while from > 0 and not view.is_empty(buf, from) do
-      from = from - 1
-    end
-    while to < lcount and not view.is_empty(buf, to) do
-      to = to + 1
-    end
-
     return from + 1, to + 2
   end
 end
