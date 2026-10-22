@@ -64,7 +64,7 @@ local function term(fn, ...)
 end
 map({ "n", "t" }, "<C-`>", term "toggle", { desc = "Terminal Toggle Pane" })
 map({ "n", "t" }, "<C-S-`>", term "new", { desc = "Terminal New Tab" })
-map({ "n", "t" }, "<C-A-`>", term "toggle_height", { desc = "Terminal Maximize Pane" })
+map({ "n", "t" }, "<C-A-`>", term "toggle_height", { desc = "Maximize Bottom Panel" })
 -- <C-Tab> / <C-S-Tab> in a terminal cycle the pane's tabs; see the unified
 -- buf_cycle() maps further down (they also handle code buffers).
 
@@ -192,7 +192,7 @@ map("n", "<leader>tn", term "new", { desc = "Terminal New Tab" })
 map("n", "<leader>t]", term("cycle", 1), { desc = "Terminal Next Tab" })
 map("n", "<leader>t[", term("cycle", -1), { desc = "Terminal Prev Tab" })
 map("n", "<leader>tx", term "close", { desc = "Terminal Close Tab" })
-map("n", "<leader>tz", term "toggle_height", { desc = "Terminal Maximize Pane" })
+map("n", "<leader>tz", term "toggle_height", { desc = "Maximize Bottom Panel" })
 
 -- Code / LSP Actions (<leader>c)
 -- Refactoring & Actions

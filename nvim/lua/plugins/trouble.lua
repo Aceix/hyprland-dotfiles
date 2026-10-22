@@ -11,12 +11,17 @@ return {
 
     -- Bottom lists (Problems, quickfix, ...) take the terminal pane's place,
     -- like a tab of VS Code's panel (utils/term.lua). Trouble splits with
-    -- autocmds off, so this is the one place that sees the window open.
+    -- autocmds off, so this is the one place that sees the window open. It
+    -- opens at the panel's height, so nothing jumps when it's adopted.
     local Window = require "trouble.view.window"
     local mount = Window.mount
     function Window:mount()
+      local bottom = self.opts.type == "split" and self.opts.position == "bottom"
+      if bottom then
+        self.opts.size = require("utils.term").height()
+      end
       mount(self)
-      if self.opts.type == "split" and self.opts.position == "bottom" and self.win then
+      if bottom and self.win then
         require("utils.term").adopt(self.win)
       end
     end

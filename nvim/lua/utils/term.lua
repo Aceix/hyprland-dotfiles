@@ -7,8 +7,9 @@
 -- groups and trails off into a heavy rule, which is what visually separates the
 -- terminal from the code window above it.
 --
--- Like VS Code's panel, the bottom shows one view at a time: a bottom Trouble
--- list (Problems, quickfix, ...) takes the pane's place at the same height,
+-- Like VS Code's panel, the bottom shows one view at a time: a list (a bottom
+-- Trouble list -- Problems, quickfix, ... -- or the native quickfix / location
+-- list window) takes the pane's place at the same height, maximized or not,
 -- with the same tab bar, and showing a terminal again puts the pane back.
 
 local api = vim.api
@@ -20,7 +21,7 @@ local state = {
   order = {}, -- terminal buffers, in tab order
   win = nil, -- the bottom pane window
   active = nil, -- buffer currently shown in the pane
-  maximized = false, -- pane blown up to full height, see M.toggle_height()
+  maximized = false, -- panel blown up to full height, whatever tab; see M.toggle_height()
   height = nil, -- bottom panel height once resized, shared with Problems
   -- Buffer that was on screen when the pane window went away by itself; see the
   -- TermClose/WinClosed pair at the bottom of this file.
@@ -58,24 +59,32 @@ function M.is_open()
   return state.win ~= nil and api.nvim_win_is_valid(state.win)
 end
 
--- Trouble marks its windows with w:trouble; the bottom split ones share the
--- pane's slot (plugins/trouble.lua hands them to M.adopt)
-local function is_problems_win(win)
+local WINBAR = "%!v:lua.require'utils.term'.winbar()"
+
+-- The mode of a list sharing the pane's slot, nil for any other window: a
+-- bottom Trouble split (w:trouble; plugins/trouble.lua hands it to M.adopt) or
+-- the native quickfix / location list window (adopted on BufWinEnter below)
+local function list_mode(win)
   local t = vim.w[win].trouble
-  return type(t) == "table" and t.type == "split" and t.position == "bottom"
+  if type(t) == "table" then
+    return t.type == "split" and t.position == "bottom" and t.mode or nil
+  end
+  local kind = vim.fn.win_gettype(win)
+  return (kind == "quickfix" or kind == "loclist") and kind or nil
 end
 
--- The bottom Trouble lists on screen in this tab (one, unless just opened)
-local function problems_wins()
-  return vim.tbl_filter(is_problems_win, api.nvim_tabpage_list_wins(0))
+-- The lists on screen in this tab (one, unless just opened)
+local function list_wins()
+  return vim.tbl_filter(list_mode, api.nvim_tabpage_list_wins(0))
 end
 
---- Whether `win` is the bottom panel: the terminal pane or a bottom Trouble list.
+--- Whether `win` is the bottom panel: the terminal pane or a list.
 function M.is_panel_win(win)
-  return win == state.win or is_problems_win(win)
+  return win == state.win or list_mode(win) ~= nil
 end
 
-local problems_label = { diagnostics = "Problems", qflist = "Quickfix", loclist = "Location List" }
+local problems_label =
+  { diagnostics = "Problems", qflist = "Quickfix", quickfix = "Quickfix", loclist = "Location List" }
 
 -- The Trouble tabs: Problems always, another bottom list while it's shown
 local function lists_shown(mode)
@@ -149,7 +158,7 @@ function M.winbar()
 
   local parts, used = {}, 0
   local win = vim.g.statusline_winid or api.nvim_get_current_win()
-  local problems = is_problems_win(win) and vim.w[win].trouble.mode or nil
+  local problems = list_mode(win)
 
   for i, buf in ipairs(state.order) do
     local text = string.format(" %s %d %s ", is_named(buf) and icon.output or icon.term, i, label(buf))
@@ -201,7 +210,7 @@ end
 
 -- 1: Problems, 2: the other Trouble list, already on screen
 function _G.__nvterm_problems(which)
-  local win = problems_wins()[1]
+  local win = list_wins()[1]
   if which == 2 and win then
     api.nvim_set_current_win(win)
   else
@@ -211,13 +220,19 @@ end
 
 --- Pane ---------------------------------------------------------------------
 
+-- The one height every tab gets: as tall as Neovim allows while maximized
+-- (requests are clamped to the room there is), else the last one it was
+-- resized to, else 30%
 local function pane_height()
+  if state.maximized then
+    return vim.o.lines
+  end
   return state.height or math.max(10, math.floor(vim.o.lines * 0.3))
 end
 
 -- Keep the size a bottom panel window had, for the next one shown there
 local function remember(win)
-  if win and api.nvim_win_is_valid(win) and not (win == state.win and state.maximized) then
+  if win and api.nvim_win_is_valid(win) and not state.maximized then
     local height = api.nvim_win_get_height(win)
     if height >= 3 then
       state.height = height
@@ -239,7 +254,7 @@ local function configure_win(win)
   -- 'winfixheight' and put the sign column back -- a resize of the shell
   wo.winfixwidth = false
   wo.winhighlight = ""
-  wo.winbar = "%!v:lua.require'utils.term'.winbar()"
+  wo.winbar = WINBAR
   wo.statuscolumn = "" -- (utils/fold_gutter.lua's would take a column)
   wo.fillchars = "eob: "
   -- The row separating the pane from the code above is drawn by the window
@@ -256,16 +271,14 @@ local function ensure_pane()
     return state.win
   end
 
-  -- One view at a time: the terminals replace a bottom Trouble list
-  for _, win in ipairs(problems_wins()) do
+  -- One view at a time: the terminals replace a list
+  for _, win in ipairs(list_wins()) do
     remember(win)
     pcall(api.nvim_win_close, win, false)
   end
 
-  vim.cmd "botright split"
+  vim.cmd("botright " .. pane_height() .. "split")
   state.win = api.nvim_get_current_win()
-  state.maximized = false
-  api.nvim_win_set_height(state.win, pane_height())
   configure_win(state.win)
   require("utils.layout").dock()
 
@@ -313,7 +326,6 @@ local function close_pane(keep_cursor)
     api.nvim_win_close(state.win, false)
   end
   state.win = nil
-  state.maximized = false
   state.taken_down_by = nil
 
   -- Always leave the cursor in a code window, never on nvim-tree or a panel.
@@ -408,19 +420,24 @@ function M.show(buf, opts)
   end
 end
 
---- Gives a bottom Trouble list (just opened in `win`) the pane's place: same
---- height and tab bar, with the pane put away until a terminal is shown again.
---- Called by plugins/trouble.lua.
+--- Gives a list (just opened in `win`) the pane's place: same height and tab
+--- bar, with the pane put away until a terminal is shown again. Called by
+--- plugins/trouble.lua and for the native quickfix / location list below.
 function M.adopt(win)
+  vim.wo[win].winbar = WINBAR
+  vim.wo[win].winfixheight = true
+  vim.wo[win].winfixwidth = false -- (Trouble's) it spans the editor column
+  -- Sized before the old tab goes, and again after for the rows it freed
+  -- (maximized). Sized only after, when the old tab was below it (a :lopen),
+  -- Neovim's first resize came out a row too tall.
+  api.nvim_win_set_height(win, pane_height())
   close_pane(true)
-  for _, other in ipairs(problems_wins()) do
+  for _, other in ipairs(list_wins()) do
     if other ~= win then
       remember(other)
       pcall(api.nvim_win_close, other, false)
     end
   end
-  vim.wo[win].winfixheight = true
-  vim.wo[win].winbar = "%!v:lua.require'utils.term'.winbar()"
   api.nvim_win_set_height(win, pane_height())
   require("utils.layout").dock()
   -- Like any panel tab, it takes the cursor (Trouble's own default is to stay)
@@ -436,7 +453,8 @@ function M.owns(buf)
   return index_of(buf) ~= nil
 end
 
---- The bottom panel's height: the last one it was resized to, else 30%.
+--- The bottom panel's height: everything while maximized, else the last one it
+--- was resized to, else 30%.
 M.height = pane_height
 
 --- Whether `buf` is the tab currently on screen in the pane.
@@ -473,22 +491,20 @@ function M.toggle()
   end
 end
 
---- Flip the pane between its default height and as tall as Neovim allows,
---- opening (and focusing) it first if it's closed. 'winfixheight' only blocks
---- *automatic* resizes, so an explicit height still goes through; the request
---- is clamped to whatever room the windows above can give up.
+--- Flip the panel between its default height and as tall as Neovim allows,
+--- whichever tab is showing; it stays that way through tab switches (and
+--- hiding), like VS Code's. Closed, it's opened (and focused) maximized.
+--- 'winfixheight' only blocks *automatic* resizes, so an explicit height still
+--- goes through.
 function M.toggle_height()
-  prune()
-
-  if not M.is_open() then
+  local win = M.is_open() and state.win or list_wins()[1]
+  if win then
+    state.maximized = not state.maximized
+    api.nvim_win_set_height(win, pane_height())
+  else
+    state.maximized = true
     M.toggle()
-    if not M.is_open() then
-      return
-    end
   end
-
-  state.maximized = not state.maximized
-  api.nvim_win_set_height(state.win, state.maximized and vim.o.lines or pane_height())
 end
 
 --- Cycle through the bottom panel's tabs, terminals then Problems, from the
@@ -496,7 +512,7 @@ end
 function M.cycle(step)
   prune()
   local cur = api.nvim_get_current_win()
-  local mode = is_problems_win(cur) and vim.w[cur].trouble.mode or nil
+  local mode = list_mode(cur)
 
   local tabs = vim.list_extend(vim.list_slice(state.order), lists_shown(mode))
   local idx = mode and #state.order + (mode == "diagnostics" and 1 or 2) or index_of(state.active) or 1
@@ -588,7 +604,7 @@ api.nvim_create_autocmd("WinClosed", {
   group = group,
   callback = function(args)
     local win = tonumber(args.match)
-    if win and is_problems_win(win) then -- e.g. `q` in Trouble
+    if win and list_mode(win) then -- e.g. `q` in Trouble, :cclose
       remember(win)
     end
     if win ~= state.win then
@@ -636,8 +652,28 @@ api.nvim_create_autocmd("BufWinEnter", {
   end,
 })
 
+-- The native quickfix / location list window (:copen, :lopen, quicker.nvim,
+-- ...) is a list tab too. Neovim re-enters its buffer on every list refresh
+-- (:make, :grep, ...) and a few times per open, so only a window not marked
+-- yet is new. (A mark, not the winbar: a split copies the winbar of the window
+-- it's split from, e.g. :copen from Problems, but not w: variables.)
+api.nvim_create_autocmd("BufWinEnter", {
+  group = group,
+  callback = function(args)
+    local win = api.nvim_get_current_win()
+    if vim.bo[args.buf].buftype == "quickfix" and list_mode(win) then
+      vim.schedule(function()
+        if api.nvim_win_is_valid(win) and not vim.w[win].nvterm_list then
+          vim.w[win].nvterm_list = true
+          M.adopt(win)
+        end
+      end)
+    end
+  end,
+})
+
 -- Remember the bottom panel's height when it's resized (mouse drag, :resize),
--- for the next terminal or Problems shown there. Not when it grew or shrank
+-- for the next terminal or list shown there. Not when it grew or shrank
 -- because a window opened or closed next to it. (Floats -- hovers,
 -- notifications, completion menus -- reflow nothing, and used to leave the
 -- flag set so the next real resize was ignored.)
