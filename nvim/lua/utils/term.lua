@@ -230,16 +230,6 @@ local function pane_height()
   return state.height or math.max(10, math.floor(vim.o.lines * 0.3))
 end
 
--- Keep the size a bottom panel window had, for the next one shown there
-local function remember(win)
-  if win and api.nvim_win_is_valid(win) and not state.maximized then
-    local height = api.nvim_win_get_height(win)
-    if height >= 3 then
-      state.height = height
-    end
-  end
-end
-
 local function configure_win(win)
   local wo = vim.wo[win]
   wo.number = false
@@ -273,7 +263,6 @@ local function ensure_pane()
 
   -- One view at a time: the terminals replace a list
   for _, win in ipairs(list_wins()) do
-    remember(win)
     pcall(api.nvim_win_close, win, false)
   end
 
@@ -322,7 +311,6 @@ local function close_pane(keep_cursor)
   local target = M.is_open() and (in_pane or not keep_cursor) and pick_code_win() or nil
 
   if M.is_open() then
-    remember(state.win)
     api.nvim_win_close(state.win, false)
   end
   state.win = nil
@@ -434,10 +422,12 @@ function M.adopt(win)
   close_pane(true)
   for _, other in ipairs(list_wins()) do
     if other ~= win then
-      remember(other)
       pcall(api.nvim_win_close, other, false)
     end
   end
+  -- Focused first, like a terminal tab: maximized, the current window keeps a
+  -- text line under its winbar, so sized from the code it came out a row short
+  api.nvim_set_current_win(win)
   api.nvim_win_set_height(win, pane_height())
   require("utils.layout").dock()
   -- Like any panel tab, it takes the cursor (Trouble's own default is to stay)
@@ -604,9 +594,6 @@ api.nvim_create_autocmd("WinClosed", {
   group = group,
   callback = function(args)
     local win = tonumber(args.match)
-    if win and list_mode(win) then -- e.g. `q` in Trouble, :cclose
-      remember(win)
-    end
     if win ~= state.win then
       return
     end
@@ -673,11 +660,19 @@ api.nvim_create_autocmd("BufWinEnter", {
 })
 
 -- Remember the bottom panel's height when it's resized (mouse drag, :resize),
--- for the next terminal or list shown there. Not when it grew or shrank
--- because a window opened or closed next to it. (Floats -- hovers,
--- notifications, completion menus -- reflow nothing, and used to leave the
+-- for the next terminal or list shown there -- the only place it's recorded.
+-- Not when it grew or shrank because a window opened or closed next to it:
+-- a tab switch opens the new tab's window first, so the old one is briefly
+-- taller. (Floats -- hovers, notifications, completion menus -- reflow
+-- nothing, and windows of another tab nothing here; either used to leave the
 -- flag set so the next real resize was ignored.)
 local reflowed = false
+api.nvim_create_autocmd("TabEnter", {
+  group = group,
+  callback = function()
+    reflowed = false
+  end,
+})
 api.nvim_create_autocmd({ "WinNew", "WinClosed" }, {
   group = group,
   callback = function(args)
