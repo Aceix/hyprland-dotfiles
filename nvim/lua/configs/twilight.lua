@@ -2,7 +2,8 @@
 -- loop, try, function, method, class, table/object literal, HTML/JSX
 -- element, ...), found with
 -- tree-sitter, however long it is. Where there's no block (top-level code, no
--- parser for the filetype) it's exactly RADIUS lines either side.
+-- parser for the filetype) it's exactly RADIUS lines either side. In visual
+-- mode every selected line lights up too.
 --
 -- Upstream's context instead grows to the outermost node of a few literal
 -- types ("function", "if_statement", ...) that most parsers don't use, or
@@ -149,6 +150,11 @@ local function dim_colors(buf, top, bot)
   saved[buf] = next(own) and own or nil
 end
 
+-- v, V and Ctrl-V
+local function is_visual(mode)
+  return mode:find "^[vV\22]" ~= nil
+end
+
 return function(_, opts)
   require("twilight").setup(opts)
   local view = require "twilight.view"
@@ -167,6 +173,16 @@ return function(_, opts)
       saved[ev.buf] = nil
     end,
   })
+  -- Twilight only updates on cursor moves, so v or <Esc> alone would leave the
+  -- lit lines stale
+  api.nvim_create_autocmd("ModeChanged", {
+    callback = function()
+      local ev = vim.v.event
+      if view.enabled and is_visual(ev.old_mode) ~= is_visual(ev.new_mode) then
+        view.update()
+      end
+    end,
+  })
 
   -- line: 0-based cursor line. Returns the lit lines as 1-based [from, to).
   view.get_context = function(buf, line)
@@ -174,6 +190,12 @@ return function(_, opts)
     if not from then
       from = math.max(0, line - RADIUS)
       to = math.min(api.nvim_buf_line_count(buf) - 1, line + RADIUS)
+    end
+    -- The block holds the cursor line, so only the selection's other end can
+    -- reach past it
+    if buf == api.nvim_get_current_buf() and is_visual(api.nvim_get_mode().mode) then
+      local anchor = vim.fn.line "v" - 1
+      from, to = math.min(from, anchor), math.max(to, anchor)
     end
     return from + 1, to + 2
   end
