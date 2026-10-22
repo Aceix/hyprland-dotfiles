@@ -1,6 +1,6 @@
 -- Side-by-side diffs (diffview, the sidebar's diff, :diffsplit, tree compare)
 -- behave like VS Code's diff editor:
---   * the panes in a row always split the space evenly, whatever focus.nvim
+--   * the panes in a row always split the space evenly, whatever auto-resize
 --     did to the windows before 'diff' got switched on
 --   * the mouse wheel over either pane scrolls both, even the unfocused one
 --     (Neovim only follows 'scrollbind' from the current window)
@@ -31,7 +31,6 @@ function M.balance()
       end)
       local total = 0
       for _, win in ipairs(wins) do
-        vim.w[win].focus_disable = true -- focus.nvim: leave the split alone
         total = total + vim.api.nvim_win_get_width(win)
       end
       local width = math.floor(total / #wins)
@@ -68,8 +67,6 @@ function M.setup()
     callback = function()
       if vim.wo.diff then
         vim.schedule(M.balance)
-      else
-        vim.w.focus_disable = nil -- out of diff mode: auto-resize again
       end
     end,
   })

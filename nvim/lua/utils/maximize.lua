@@ -21,10 +21,10 @@ function M.maximize()
   vim.t.maximized = {
     restore = vim.fn.winrestcmd(),
     wins = #normal,
-    focus_disable = vim.g.focus_disable or false,
+    autoresize = require("utils.autoresize").enabled,
   }
-  -- focus.nvim would regrow whichever split is entered next
-  vim.g.focus_disable = true
+  -- auto-resize would regrow whichever split is entered next
+  require("utils.autoresize").enabled = false
 
   local fixed = {}
   for _, win in ipairs(normal) do
@@ -44,7 +44,7 @@ function M.restore()
     return
   end
   vim.t.maximized = nil
-  vim.g.focus_disable = state.focus_disable
+  require("utils.autoresize").enabled = state.autoresize
 
   local normal = normal_wins()
   if #normal == state.wins then

@@ -380,6 +380,10 @@ if require("utils.remote").is_remote then
 end
 
 
+-- Golden-ratio resize of the focused code split, panels never touched
+-- (utils/autoresize.lua)
+require("utils.autoresize").setup()
+
 -- Diff panes split 50/50 and scroll together under the mouse (utils/diff.lua)
 require("utils.diff").setup()
 

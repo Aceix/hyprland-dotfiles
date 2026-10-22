@@ -545,7 +545,12 @@ function M.setup()
   -- options: fixed 40-col width, the tab-strip winbar, edgy's highlights.
   -- Put those back to normal on any window that isn't part of the sidebar.
   local function scrub(win)
-    if M.is_sidebar_win(win) or vim.api.nvim_win_get_config(win).relative ~= "" then
+    -- (the bottom panel sets its own options, utils/term.lua's configure_win)
+    if
+      M.is_sidebar_win(win)
+      or vim.api.nvim_win_get_config(win).relative ~= ""
+      or require("utils.term").is_panel_win(win)
+    then
       return false
     end
     local wo = vim.wo[win]
@@ -575,12 +580,10 @@ function M.setup()
         end
         -- The inherited width already skewed this tab's layout
         if fixed and not has_sidebar then
-          -- 'winfixwidth' keeps panels out of the equalise; "autoresize"
-          -- (not focus.nvim's equalise goal, which sticks) regrows the split
+          -- 'winfixwidth' keeps panels out of the equalise; auto-resize
+          -- regrows the split
           vim.cmd "wincmd ="
-          if package.loaded.focus then
-            require("focus").resize "autoresize"
-          end
+          require("utils.autoresize").resize()
         end
       end)
     end,

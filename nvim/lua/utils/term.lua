@@ -234,6 +234,11 @@ local function configure_win(win)
   wo.cursorline = false
   wo.spell = false
   wo.winfixheight = true
+  -- Split off the side bar, the pane inherits its options; edgy's winhighlight
+  -- made utils/git_sidebar.lua "scrub" it, which dropped this winbar and
+  -- 'winfixheight' and put the sign column back -- a resize of the shell
+  wo.winfixwidth = false
+  wo.winhighlight = ""
   wo.winbar = "%!v:lua.require'utils.term'.winbar()"
   wo.statuscolumn = "" -- (utils/fold_gutter.lua's would take a column)
   wo.fillchars = "eob: "
@@ -664,53 +669,24 @@ api.nvim_create_autocmd("WinResized", {
   end,
 })
 
--- Full-screen apps (Claude Code, htop, ...) can leave Neovim's copy of the
--- terminal screen a line or more short when they redraw -- and many redraw on
--- every focus change, which Neovim reports to them when Terminal mode is
--- entered or left. Neovim then lines the window up with the end of that copy,
--- so a stale line shows at the top and the screen sits too low, until a resize
--- rebuilds it. So resize it: one row taller (the winbar off, then on again,
--- which leaves the layout alone) once the app has had its redraw. Only while a
--- program runs in the shell; a bare prompt isn't affected.
-local function running(buf)
-  local ok, pid = pcall(vim.fn.jobpid, vim.bo[buf].channel)
-  return ok and pid > 0 and #api.nvim_get_proc_children(pid) > 0
-end
-
-local resyncing = {}
-local function resync(buf)
-  local win = state.win
-  if resyncing[buf] or not M.is_showing(buf) or not running(buf) then
-    return
-  end
-  resyncing[buf] = true
-  local winbar = vim.wo[win].winbar
-  vim.wo[win].winbar = ""
-  -- (each size has to reach the app, so not within the same tick)
-  vim.defer_fn(function()
-    resyncing[buf] = nil
-    if api.nvim_win_is_valid(win) then
-      vim.wo[win].winbar = winbar
-      -- Unfocused, keep showing the live screen as the app goes on: Neovim
-      -- follows the output while the cursor is on the last line
-      if win ~= api.nvim_get_current_win() then
-        api.nvim_win_set_cursor(win, { api.nvim_buf_line_count(buf), 0 })
-      end
-    end
-  end, 50)
-end
-
-api.nvim_create_autocmd({ "TermEnter", "TermLeave" }, {
+-- The pane's size only changes when you resize it or a window opens / closes
+-- beside it: every resize reaches the program as SIGWINCH and full-screen apps
+-- (Claude Code, htop, lazygit, ...) redraw on it, glitching or leaving stale
+-- lines. (A winbar off/on "resync" used to run here on every Terminal mode
+-- enter / leave to clean up after focus.nvim's resize-and-restore of the pane
+-- on each window switch; both are gone.)
+--
+-- Unfocused, keep showing the live screen as the program goes on: Neovim
+-- follows the output while the cursor is on the last line.
+api.nvim_create_autocmd("TermLeave", {
   group = group,
   callback = function(args)
-    vim.defer_fn(function()
-      -- Not while the pane is being read in Normal mode (scrolling, copying):
-      -- that's left alone until Terminal mode is entered again
-      if api.nvim_get_current_win() == state.win and api.nvim_get_mode().mode ~= "t" then
-        return
+    vim.schedule(function()
+      local win = state.win
+      if M.is_showing(args.buf) and win ~= api.nvim_get_current_win() then
+        api.nvim_win_set_cursor(win, { api.nvim_buf_line_count(args.buf), 0 })
       end
-      resync(args.buf)
-    end, 150)
+    end)
   end,
 })
 

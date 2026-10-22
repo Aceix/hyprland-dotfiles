@@ -321,18 +321,7 @@ map("n", "]d", vim.diagnostic.goto_next, { desc = "Next Diagnostic" })
 -- UI Layout & Toggles (<leader>u)
 map("n", "<leader>uW", "<cmd>Twilight<cr>", { desc = "Toggle Twilight Dimming" })
 map("n", "<leader>uT", call("configs.transparency", "toggle"), { desc = "Toggle Transparency/Opaque" })
--- Flips focus.nvim's global switch directly: :FocusToggle reads the current
--- buffer's flag too, so pressed from the side bar or terminal it inverts
-map("n", "<leader>uf", function()
-  local focus = require "focus"
-  vim.g.focus_disable = not vim.g.focus_disable
-  if vim.g.focus_disable then
-    vim.cmd "wincmd ="
-  else
-    focus.resize "autoresize"
-  end
-  vim.notify("Auto-resize " .. (vim.g.focus_disable and "off" or "on"))
-end, { desc = "Toggle Window Auto-Resize" })
+map("n", "<leader>uf", call("utils.autoresize", "toggle"), { desc = "Toggle Window Auto-Resize" })
 map("n", "<leader>um", call("utils.maximize", "toggle"), { desc = "Maximize Split Window" })
 map("n", "<leader>ui", call("utils.svg_preview", "toggle"), { desc = "Toggle SVG Code/Preview" })
 -- Also flips the auto-open flag read by the MiniMapAutoOpen autocmd (see
