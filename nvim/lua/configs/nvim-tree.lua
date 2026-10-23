@@ -101,6 +101,10 @@ M.opts = function(_, opts)
   opts.filters.dotfiles = false
   opts.filters.git_ignored = false
 
+  -- Revealing the focused file is done in M.config, which skips dependency
+  -- and outside-cwd files; nvim-tree's own would also reveal on open/toggle
+  opts.update_focused_file = { enable = false }
+
   -- The side bar's width (utils/git_sidebar.lua), which nvim-tree resizes to
   -- on open and on opening a file; NvChad's fixed 30 reset a resized Explorer
   opts.view = opts.view or {}
@@ -129,6 +133,30 @@ end
 
 M.config = function(_, opts)
   require("nvim-tree").setup(opts)
+
+  -- Follow the focused file like VS Code, except files in dependency folders
+  -- or outside the cwd (utils/dep_dirs.lua): a go-to-definition into
+  -- node_modules shouldn't unfold it. <leader>E reveals one explicitly.
+  local api = require "nvim-tree.api"
+  local function reveal(buf)
+    local name = vim.api.nvim_buf_get_name(buf)
+    if vim.bo[buf].buftype == "" and name ~= "" and not require("utils.dep_dirs").is_external(name) then
+      api.tree.find_file { buf = buf }
+    end
+  end
+  vim.api.nvim_create_autocmd("BufEnter", {
+    callback = function(ev)
+      reveal(ev.buf)
+    end,
+  })
+  -- Unless opened unfocused, the tree's window is current here; the file is
+  -- in the one it opened from
+  api.events.subscribe(api.events.Event.TreeOpen, function()
+    local win = vim.bo.filetype == "NvimTree" and vim.fn.win_getid(vim.fn.winnr "#") or 0
+    if vim.api.nvim_win_is_valid(win) or win == 0 then
+      reveal(vim.api.nvim_win_get_buf(win))
+    end
+  end)
 
   -- Staged/Merge/Renamed file-status colors, kept off red/yellow (see
   -- chadrc.lua's base46.hl_override for Dirty/New/Deleted/Ignored).

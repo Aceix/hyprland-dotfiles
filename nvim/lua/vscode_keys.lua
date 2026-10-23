@@ -23,7 +23,7 @@ end
 pcall(vim.keymap.del, "n", "<C-k>")
 
 -- === Navigation & LSP =======================================================
-map({ "n", "i" }, "<C-p>", tele("find_files", { hidden = true }), { desc = "Quick Open (files)" })
+map({ "n", "i" }, "<C-p>", tele "find_files", { desc = "Quick Open (files)" })
 map(niv, "<C-S-p>", tele "commands", { desc = "Command Palette" })
 map(niv, "<F1>", tele "commands", { desc = "Command Palette" })
 map("n", "<C-S-f>", tele "live_grep", { desc = "Search in files" })

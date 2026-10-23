@@ -63,7 +63,7 @@ local function close_scm()
 end
 
 local function open_explorer()
-  require("nvim-tree.api").tree.open { find_file = true }
+  require("nvim-tree.api").tree.open()
 end
 
 local function open_scm()

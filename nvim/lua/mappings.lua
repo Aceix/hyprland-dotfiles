@@ -121,8 +121,14 @@ end
 -- falls back to it off the gutter.
 map("n", "<RightMouse>", call("utils.tree_menu", "right_click"), { expr = true, desc = "Context menu" })
 
+-- The Explorer skips auto-revealing dependency/outside files (configs/nvim-tree.lua);
+-- this reveals the current file regardless
+map("n", "<leader>E", function()
+  require("nvim-tree.api").tree.find_file { open = true, focus = true }
+end, { desc = "Reveal file in Explorer" })
+
 -- Open file finder by pressing leader twice
-map("n", "<leader><leader>", "<cmd>Telescope find_files hidden=true<cr>", { desc = "Telescope Find Files" })
+map("n", "<leader><leader>", "<cmd>Telescope find_files<cr>", { desc = "Telescope Find Files" })
 
 -- Window navigation (Ctrl+Alt+arrows)
 map("n", "<CA-Left>", "<C-w>h", { desc = "Window move left" })
@@ -297,7 +303,7 @@ if wk_ok then
 end
 
 -- File & Navigation Pickers (<leader>f)
-map("n", "<leader>ff", "<cmd>Telescope find_files hidden=true<cr>", { desc = "Find Files" })
+map("n", "<leader>ff", "<cmd>Telescope find_files<cr>", { desc = "Find Files" })
 map("n", "<leader>fg", "<cmd>Telescope live_grep<cr>", { desc = "Live Grep (Text Search)" })
 map("n", "<leader>fb", "<cmd>Telescope buffers<cr>", { desc = "Open Buffers" })
 map("n", "<leader>fr", "<cmd>Telescope oldfiles<cr>", { desc = "Recent Files" })
