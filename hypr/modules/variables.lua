@@ -17,4 +17,10 @@ return {
 		code_editor = "code",
 		calculator = "gnome-calculator",
 	},
+
+	-- Run a hymission action, then hide Noctalia's bar/widgets while overview is open
+	overview = function(action)
+		hl.plugin.hymission[action]()
+		hl.exec_cmd("~/.config/hypr/scripts/overview_noctalia.sh")
+	end,
 }

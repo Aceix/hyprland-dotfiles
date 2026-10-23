@@ -10,10 +10,6 @@
 -- `local`s don't cross file boundaries, so anything shared between modules
 -- (monitor names, program commands) lives in modules/variables.lua.
 
--- Scripts log here, and logs/ is gitignored, so a fresh clone lacks it; without
--- it the shell can't open the `>> logs/x.log` redirects and skips the commands.
-os.execute("mkdir -p " .. os.getenv("HOME") .. "/.config/hypr/scripts/logs")
-
 require("modules.monitors")
 require("modules.debug")
 require("modules.autostart")

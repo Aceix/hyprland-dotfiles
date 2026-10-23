@@ -23,7 +23,7 @@ hl.on("hyprland.start", function()
 	hl.exec_cmd("~/.config/hypr/scripts/dnd-toggle.sh")
 	hl.exec_cmd("~/.config/hypr/scripts/launch_noctalia.sh >> ~/.config/hypr/scripts/logs/launch_noctalia.log 2>&1")
 
-  hl.exec_cmd("hyprctl plugin load ~/src/hyprmodoro/hyprmodoro.so")
+  hl.exec_cmd("hyprctl plugin load /home/aceix/src/hyprmodoro/hyprmodoro.so")
 end)
 
 -- exec (runs on every config load, including the first)

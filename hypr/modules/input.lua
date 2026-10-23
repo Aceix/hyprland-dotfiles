@@ -2,6 +2,8 @@
 -- INPUT ----
 -------------
 
+local vars = require("modules.variables")
+
 -- https://wiki.hypr.land/Configuring/Variables/#input
 hl.config({
 	input = {
@@ -38,7 +40,7 @@ hl.config({
 hl.gesture({ fingers = 3, direction = "vertical", action = "workspace" })
 
 -- Bind 3 finger swipe up to open overview
-hl.gesture({ fingers = 4, direction = "up", action = function() hl.plugin.hymission.open() end })
+hl.gesture({ fingers = 4, direction = "up", action = function() vars.overview("open") end })
 
 -- Bind 3 finger swipe down to close overview
 hl.gesture({ fingers = 4, direction = "down", action = function() hl.plugin.hymission.close() end })

@@ -6,69 +6,69 @@
 --   require("hyprmodoro")
 
 local ok, err = pcall(function()
-	hl.config({
-		plugin = {
-			hyprmodoro = {
-				enabled = false,
-				work_duration = 25,
-				rest_duration = 5,
-				auto_transition = true,
-				title = {
-					enabled = true,
-					all_windows = false,
-					reserve_space_all = false,
-					floating_window = false,
-					position = "top",
-					overlay = false,
-					margin = 15,
-					spacing = 8,
-				},
-				border = {
-					enabled = true,
-					all_windows = false,
-					floating_window = false,
-					color = rgba(33333388),
-				},
-				text = {
-					color = rgba(ffffffff),
-					font = "Sans",
-					size = 17,
-					work_prefix = "🍅",
-					rest_prefix = "☕",
-					waiting_prefix = "⏸",
-					skip_on_click = true,
-				},
-				sound = {
-					player = "pw-play",
-				},
-				notification = {
-					enabled = true,
-					use_system_notifications = false,
-					work_end = "Work session complete",
-					rest_end = "Break is over",
-				},
-				buttons = {
-					size = 17,
-					color = {
-						foreground = rgba(ffffffff),
-						background = rgba(ffffff44),
-					},
-				},
-				hover = {
-					text = false,
-					buttons = true,
-					height = 10,
-					width = 20,
-				},
-				window = {
-					min_width = 300,
-					padding = 0,
-				},
-			},
-		},
-	})
+  hl.config({
+    plugin = {
+      hyprmodoro = {
+      enabled = false,
+      work_duration = 25,
+      rest_duration = 5,
+      auto_transition = true,
+      title = {
+        enabled = true,
+        all_windows = false,
+        reserve_space_all = false,
+        floating_window = false,
+        position = "top",
+        overlay = false,
+        margin = 15,
+        spacing = 8,
+      }
+      border = {
+        enabled = true,
+        all_windows = false,
+        floating_window = false,
+        color = rgba(33333388),
+      }
+      text = {
+        color = rgba(ffffffff),
+        font = "Sans",
+        size = 17,
+        work_prefix = "🍅",
+        rest_prefix = "☕",
+        waiting_prefix = "⏸",
+        skip_on_click = true,
+      }
+      sound = {
+        player = "pw-play",
+      }
+      notification = {
+        enabled = true,
+        use_system_notifications = false,
+        work_end = "Work session complete",
+        rest_end = "Break is over",
+      }
+      buttons = {
+        size = 17,
+        color = {
+          foreground = rgba(ffffffff),
+          background = rgba(ffffff44),
+        }
+      }
+      hover = {
+        text = false,
+        buttons = true,
+        height = 10,
+        width = 20,
+      }
+      window = {
+        min_width = 300,
+        padding = 0,
+      }
+      },
+    },
+  })
 end)
 
 if not ok then
-	print("[hyprmodoro] config not applied yet: " .. tostring(err))
+  print("[hyprmodoro] config not applied yet: " .. tostring(err))
 end

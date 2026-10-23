@@ -59,7 +59,7 @@ hl.bind(mainMod .. " + SHIFT + A", hl.dsp.exec_cmd("antigravity"))
 
 -- Overview plugin
 hl.bind(mainMod .. " + o", function()
-	hl.plugin.hymission.toggle()
+	vars.overview("toggle")
 end)
 
 -- Double-tap SUPER (within 400ms) to toggle the overview
@@ -75,7 +75,7 @@ hl.bind(mainMod .. " + SUPER_L", function()
 	if superTapPending then
 		superTapPending = false
 		superTapTimer:set_enabled(false)
-		hl.plugin.hymission.toggle()
+		vars.overview("toggle")
 	else
 		superTapPending = true
 		superTapTimer:set_enabled(true)
