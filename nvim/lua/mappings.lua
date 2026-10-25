@@ -112,6 +112,22 @@ do
       return switch(...)
     end
   end
+
+  -- close_buffer picks its branch from the *current* buffer, so closing a
+  -- tab (its ✕, <leader>x) while the Explorer had focus wiped the file and
+  -- closed its window instead, the Explorer taking the whole screen. Close
+  -- it from the window showing it.
+  local close = tl.close_buffer
+  tl.close_buffer = function(bufnr)
+    bufnr = bufnr or vim.api.nvim_get_current_buf()
+    local win = vim.fn.bufwinid(bufnr)
+    if win ~= -1 and win ~= vim.api.nvim_get_current_win() then
+      return vim.api.nvim_win_call(win, function()
+        return close(bufnr)
+      end)
+    end
+    return close(bufnr)
+  end
 end
 
 -- Right-click on nvim-tree opens VS Code's Explorer context menu

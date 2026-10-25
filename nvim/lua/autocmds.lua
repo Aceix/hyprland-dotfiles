@@ -292,6 +292,8 @@ vim.api.nvim_create_autocmd("User", {
 require("utils.git_sidebar").setup()
 -- Always an editor area beside the sidebar and above the bottom panel
 require("utils.layout").setup()
+-- Shortcut hints in an editor with no file open (utils/empty_state.lua)
+require("utils.empty_state").setup()
 require("utils.git_panel").setup()
 if require("settings").git_autofetch then
   require("utils.git_autofetch").start()

@@ -83,12 +83,17 @@ end
 -- restarts. edgy reads it via configs/edgy.lua's options.left.size.
 local MIN_WIDTH = 15
 
+-- Widest the side bar may be: room is always left for an editor
+local function max_width()
+  return vim.o.columns - 20
+end
+
 function M.width()
   return vim.g.SIDEBAR_WIDTH or 40
 end
 
 function M.set_width(w)
-  vim.g.SIDEBAR_WIDTH = math.max(MIN_WIDTH, math.min(w, vim.o.columns - 20))
+  vim.g.SIDEBAR_WIDTH = math.max(MIN_WIDTH, math.min(w, max_width()))
   require("edgy.layout").update()
 end
 
@@ -614,7 +619,9 @@ function M.setup()
         for _, win in ipairs(vim.v.event.windows or {}) do
           if settled[win] and vim.api.nvim_win_is_valid(win) and M.is_sidebar_win(win) then
             local w = vim.api.nvim_win_get_width(win)
-            if w ~= M.width() then
+            -- Wider than that is the editor beside it closing and the side
+            -- bar taking the screen, not a drag
+            if w ~= M.width() and w <= max_width() then
               vim.g.SIDEBAR_WIDTH = math.max(MIN_WIDTH, w)
             end
             break

@@ -45,16 +45,6 @@ return {
   },
 
   {
-    "folke/persistence.nvim",
-    lazy = false,
-    event = "BufReadPre",
-    opts = {
-      options = { "buffers", "curdir", "tabpages", "winsize" },
-      pre_load = nil, -- Ensures no flashing artifacts on startup initializing loops
-    },
-  },
-
-  {
     "3rd/image.nvim",
     build = false,
     lazy = false,
