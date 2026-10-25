@@ -83,14 +83,7 @@ return {
       }
     end,
     dependencies = {
-      {
-        "MeanderingProgrammer/render-markdown.nvim",
-        opts = {
-          anti_conceal = { enabled = false },
-          file_types = { "markdown", "opencode_output" },
-        },
-        ft = { "markdown", "Avante", "copilot-chat", "opencode_output" },
-      },
+      "MeanderingProgrammer/render-markdown.nvim", -- set up in lua/plugins/render-markdown.lua
 
       -- Optional, for file mentions and commands completion, pick only one
       "saghen/blink.cmp",
@@ -152,15 +145,6 @@ return {
   --     })
   --   end,
   -- },
-
-  {
-    "MeanderingProgrammer/render-markdown.nvim",
-    dependencies = { "nvim-treesitter/nvim-treesitter", "echasnovski/mini.icons" },
-    ft = { "markdown" }, -- Auto-triggers on markdown file launch
-    config = function()
-      require("render-markdown").setup {}
-    end,
-  },
 
   {
     "karb94/neoscroll.nvim",

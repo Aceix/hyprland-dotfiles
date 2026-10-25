@@ -62,6 +62,11 @@ local function block_at(parser, line, col)
         to = to - 1 -- ends at the start of the next line
       end
       if to > from and is_block(node:type()) then
+        if node:type() == "pipe_table" then
+          -- render-markdown draws a table's top and bottom borders over the
+          -- blank lines either side of it
+          return math.max(0, from - 1), to + 1
+        end
         return from, to
       end
       node = node:parent()
@@ -118,7 +123,51 @@ local function set_hl(opts, hl)
   end
 end
 
-local function dim_colors(buf, top, bot)
+-- render-markdown draws tables (borders, pipes, the delimiter row), heading
+-- icons, bullets, code block borders, ... as virtual text and virtual lines,
+-- which carry their own highlights and so aren't dimmed by twilight's
+-- hl_group either. A chunk's highlight can be a stack of groups, so on dimmed
+-- lines Twilight is pushed on top of each chunk's own highlight and popped
+-- once lit: the mark keeps its own look, and nothing is keyed by mark id,
+-- which render-markdown's constant redraws (and Neovim) reuse. A virtual line
+-- is dimmed with the line it hangs off.
+local markdown_ns = "render-markdown.nvim"
+
+local function is_dimmed(chunk)
+  local hl = chunk[2]
+  return type(hl) == "table" and hl[#hl] == "Twilight"
+end
+
+local function set_dimmed(chunk, dim)
+  local hl = chunk[2]
+  hl = type(hl) == "table" and vim.list_slice(hl) or { hl }
+  if dim then
+    hl[#hl + 1] = "Twilight"
+  else
+    hl[#hl] = nil
+  end
+  chunk[2] = hl
+end
+
+local function dim_markdown(buf, ns, from, to, dimmed)
+  for _, mark in ipairs(api.nvim_buf_get_extmarks(buf, ns, from, to, { details = true })) do
+    local id, row, col, opts = unpack(mark)
+    local lines = opts.virt_lines or { opts.virt_text }
+    local dim = dimmed[row] == true
+    local first = lines[1] and lines[1][1]
+    if first and dim ~= is_dimmed(first) then
+      for _, line in ipairs(lines) do
+        for _, chunk in ipairs(line) do
+          set_dimmed(chunk, dim)
+        end
+      end
+      opts.ns_id, opts.id = nil, id
+      pcall(api.nvim_buf_set_extmark, buf, ns, row, col, opts)
+    end
+  end
+end
+
+local function dim_marks(buf, top, bot)
   local from, to = { top, 0 }, { bot, -1 }
   local dimmed = {}
   for _, mark in ipairs(api.nvim_buf_get_extmarks(buf, twilight_ns, from, to, {})) do
@@ -126,7 +175,9 @@ local function dim_colors(buf, top, bot)
   end
   local own = saved[buf] or {}
   for name, ns in pairs(api.nvim_get_namespaces()) do
-    if is_color_ns(name) then
+    if name == markdown_ns then
+      dim_markdown(buf, ns, from, to, dimmed)
+    elseif is_color_ns(name) then
       for _, mark in ipairs(api.nvim_buf_get_extmarks(buf, ns, from, to, { details = true })) do
         local id, row, col, opts = unpack(mark)
         local hl = get_hl(opts)
@@ -159,12 +210,34 @@ return function(_, opts)
   require("twilight").setup(opts)
   local view = require "twilight.view"
 
+  -- Disabling clears every buffer's dimming, so give every mark its look back
+  local disable = view.disable
+  view.disable = function()
+    disable()
+    for _, buf in ipairs(api.nvim_list_bufs()) do
+      if api.nvim_buf_is_loaded(buf) then
+        dim_marks(buf, 0, -1)
+      end
+    end
+  end
+
   -- Loaded first so its provider, which (re)draws its colors, runs before ours
   require "vim.lsp.document_color"
-  api.nvim_set_decoration_provider(api.nvim_create_namespace "twilight.colors", {
-    on_win = function(_, _, buf, top, bot)
-      if view.enabled or saved[buf] then -- after disabling: give the colors back
-        dim_colors(buf, top, bot)
+  -- The marks are recolored right after the redraw, not during it: a mark
+  -- changed mid-redraw only shows on the lines not drawn yet, and nothing
+  -- repaints the rest. Changing a mark afterwards repaints its line, which
+  -- runs on_win again; that pass finds nothing to change and so stops.
+  local pending = {} -- win -> a recolor is scheduled
+  api.nvim_set_decoration_provider(api.nvim_create_namespace "twilight.marks", {
+    on_win = function(_, win, buf, top, bot)
+      if view.enabled and not pending[win] then
+        pending[win] = true
+        vim.schedule(function()
+          pending[win] = nil
+          if api.nvim_buf_is_valid(buf) then
+            dim_marks(buf, top, bot)
+          end
+        end)
       end
     end,
   })

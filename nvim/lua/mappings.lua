@@ -342,6 +342,7 @@ map("n", "]d", vim.diagnostic.goto_next, { desc = "Next Diagnostic" })
 
 -- UI Layout & Toggles (<leader>u)
 map("n", "<leader>uW", "<cmd>Twilight<cr>", { desc = "Toggle Twilight Dimming" })
+map("n", "<leader>uw", "<cmd>set wrap!<cr>", { desc = "Toggle Line Wrap" })
 map("n", "<leader>uT", call("configs.transparency", "toggle"), { desc = "Toggle Transparency/Opaque" })
 map("n", "<leader>uf", call("utils.autoresize", "toggle"), { desc = "Toggle Window Auto-Resize" })
 map("n", "<leader>um", call("utils.maximize", "toggle"), { desc = "Maximize Split Window" })
