@@ -157,6 +157,10 @@ end
 -- Open a file in the editor area, leaving the sidebar where it is (VS Code
 -- style), instead of Neogit's default of closing its status buffer.
 function M.open_in_editor(path, lnum)
+  -- An open diff gives way to the file, as opening another diff does.
+  -- Otherwise a staged diff (both sides scratch, so no usable window) would
+  -- stay put with the file squeezed into a new split beside it.
+  M.close_diff()
   local win = editor_win()
   if win then
     vim.api.nvim_set_current_win(win)
