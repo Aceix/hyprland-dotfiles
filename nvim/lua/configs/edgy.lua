@@ -60,10 +60,12 @@ return {
       -- utils/outline_dock.lua: only when docked in the side bar, where it
       -- comes and goes with the Explorer (height resizable, kept across restarts)
       ft = "Outline",
-      title = "Outline",
+      title = function()
+        return "Outline" .. require("utils.outline_dock").button()
+      end,
       size = {
         height = function()
-          return require("utils.outline_dock").height()
+          return require("utils.sidebar_split").height "Outline"
         end,
       },
       filter = function()
@@ -73,7 +75,7 @@ return {
     {
       ft = "NeogitStatus",
       title = "Source Control",
-      size = { height = 0.55 },
+      -- takes whatever the panel below leaves
       wo = { winbar = tabs },
     },
     {
@@ -81,7 +83,12 @@ return {
       title = function()
         return require("utils.git_panel").title()
       end,
-      size = { height = 0.45 },
+      -- height resizable, kept across restarts (utils/sidebar_split.lua)
+      size = {
+        height = function()
+          return require("utils.sidebar_split").height "gitpanel"
+        end,
+      },
     },
   },
 }

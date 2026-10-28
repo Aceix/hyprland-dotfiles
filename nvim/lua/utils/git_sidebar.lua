@@ -456,9 +456,8 @@ function M.neogit_open()
   end
 end
 
--- Neogit status click, VS Code style: a file opens as <CR> does, a section
--- header folds. On release, after the click moved the cursor; a drag ends in
--- Visual mode, where this normal-mode mapping doesn't fire.
+-- Neogit status double-click: a file opens as <CR> does, a section header
+-- folds. The first click has already moved the cursor there.
 function M.neogit_click()
   local status, item = neogit_item()
   local pos = vim.fn.getmousepos()
@@ -554,9 +553,11 @@ function M.setup()
   -- options: fixed 40-col width, the tab-strip winbar, edgy's highlights.
   -- Put those back to normal on any window that isn't part of the sidebar.
   local function scrub(win)
-    -- (the bottom panel sets its own options, utils/term.lua's configure_win)
+    -- (the bottom panel sets its own options, utils/term.lua's configure_win;
+    -- edgy's other views, e.g. the docked outline, are meant to have them)
     if
       M.is_sidebar_win(win)
+      or require("edgy.editor").get_win(win)
       or vim.api.nvim_win_get_config(win).relative ~= ""
       or require("utils.term").is_panel_win(win)
     then

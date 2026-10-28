@@ -52,7 +52,7 @@ return {
           -- Changed files open as a diff beside the sidebar (gf / "Open File"
           -- in the diff goes to the file itself)
           ["<cr>"] = sidebar.neogit_open,
-          ["<LeftRelease>"] = sidebar.neogit_click,
+          ["<2-LeftMouse>"] = sidebar.neogit_click,
           -- Full-tab diffview for the file under the cursor
           ["D"] = sidebar.neogit_diff,
         },

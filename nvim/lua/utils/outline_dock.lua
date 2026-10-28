@@ -1,7 +1,8 @@
 -- Where the symbol outline (outline.nvim) lives: its own pane on the right,
 -- or VS Code's Outline section -- the bottom of the side bar, under the
--- Explorer (docked by configs/edgy.lua, height resizable). <leader>cO or
--- :OutlineDock switches; the choice is kept across restarts.
+-- Explorer (docked by configs/edgy.lua, height resizable through
+-- utils/sidebar_split.lua). <leader>cO or :OutlineDock switches; the choice
+-- is kept across restarts.
 --
 -- Docked left, the outline belongs to the Explorer: switching the side bar
 -- to Source Control or hiding it (<C-b>) takes the outline with it, and it
@@ -15,12 +16,6 @@ local api = vim.api
 ---@return "left"|"right"
 function M.dock()
   return vim.g.OUTLINE_DOCK == "right" and "right" or "left"
-end
-
--- The outline's share of the side bar's height. edgy reads it via
--- configs/edgy.lua.
-function M.height()
-  return vim.g.OUTLINE_HEIGHT or 0.5
 end
 
 local function split_command()
@@ -92,7 +87,11 @@ local function open_now(focus)
   vim.defer_fn(function()
     opening = false
   end, 2000)
-  require("outline.config").o.outline_window.position = M.dock()
+  local win_opts = require("outline.config").o.outline_window
+  win_opts.position = M.dock()
+  -- outline.nvim sets its own 'winhighlight', which would wipe edgy's (the
+  -- side bar's right edge and title bar): docked left, keep edgy's
+  win_opts.winhl = M.dock() == "left" and require("configs.edgy").wo.winhighlight or ""
   require("outline").open_outline { focus_outline = focus, split_command = split_command() }
 end
 
@@ -152,15 +151,63 @@ function M.switch(side)
   M.open(true)
 end
 
+-- === Expand / collapse all ===================================================
+-- VS Code's toggle at the right of the outline's title bar: collapse all
+-- while anything is expanded, else expand all. outline.nvim's
+-- fold_toggle_all decides by the top level the same way.
+
+local function any_expanded()
+  local sidebar = package.loaded.outline and require("outline")._get_sidebar(false)
+  local folding = require "outline.folding"
+  for _, node in ipairs(sidebar and sidebar.items or {}) do
+    if folding.is_foldable(node) and not folding.is_folded(node) then
+      return true
+    end
+  end
+  return false
+end
+
+function M.toggle_folds()
+  require("outline")._sidebar_do "_toggle_all_fold"
+end
+
+-- For the side bar's title (configs/edgy.lua) and the right pane's winbar
+function M.button()
+  local icon = any_expanded() and "\u{eac5}" or "\u{eb95}" -- codicons collapse-all / expand-all
+  return "%=%@v:lua.require'utils.outline_dock'.toggle_folds@ " .. icon .. " %X"
+end
+
+function M.winbar()
+  return "%#WinBar# Outline" .. M.button()
+end
+
 function M.setup()
   local group = api.nvim_create_augroup("OutlineDock", { clear = true })
 
   api.nvim_create_autocmd("FileType", {
     group = group,
     pattern = "Outline",
-    callback = function()
+    callback = function(ev)
       wanted = true
       opening = false
+      -- The button follows the folds: redraw it whenever the outline changes
+      api.nvim_buf_attach(ev.buf, false, {
+        on_lines = function()
+          vim.schedule(function()
+            local win = vim.fn.bufwinid(ev.buf)
+            if win ~= -1 then
+              api.nvim__redraw { win = win, winbar = true }
+            end
+          end)
+        end,
+      })
+      -- In the side bar edgy draws the title bar; in its own pane, ours
+      vim.schedule(function()
+        local win = vim.fn.bufwinid(ev.buf)
+        if win ~= -1 and M.dock() == "right" then
+          vim.wo[win].winbar = "%!v:lua.require'utils.outline_dock'.winbar()"
+        end
+      end)
       local win = restore_win
       restore_win = nil
       if win then
@@ -202,63 +249,6 @@ function M.setup()
           open_now(focus)
         end
       end)
-    end,
-  })
-
-  -- Dragging the line between the Explorer and the outline: edgy snaps
-  -- heights it didn't set back to the view's size on WinResized, so record
-  -- the new share first (this runs before edgy's handler, which loads on
-  -- VeryLazy). Only once edgy has placed the outline -- while it is still
-  -- being docked, or when the screen itself resizes, the heights are not a
-  -- drag.
-  local settled = {} ---@type table<integer, boolean>
-  local lines = vim.o.lines
-
-  -- The outline and Explorer windows when both are in the side bar
-  local function pair()
-    local outline, tree = find_win "Outline", find_win "NvimTree"
-    if
-      M.dock() == "left"
-      and outline
-      and tree
-      and api.nvim_win_get_position(outline)[2] == api.nvim_win_get_position(tree)[2]
-    then
-      return outline, tree
-    end
-  end
-
-  local function settle()
-    local outline, tree = pair()
-    if outline then
-      local h = api.nvim_win_get_height(outline)
-      local total = h + api.nvim_win_get_height(tree)
-      -- edgy's sizing: floor(total * share)
-      if h == math.floor(total * M.height()) then
-        settled[outline] = true
-      end
-    end
-  end
-
-  api.nvim_create_autocmd("WinResized", {
-    group = group,
-    callback = function()
-      if vim.o.lines ~= lines then
-        lines = vim.o.lines
-      else
-        local outline, tree = pair()
-        if outline and settled[outline] and vim.tbl_contains(vim.v.event.windows or {}, outline) then
-          local h = api.nvim_win_get_height(outline)
-          local share = h / (h + api.nvim_win_get_height(tree))
-          vim.g.OUTLINE_HEIGHT = math.max(0.15, math.min(share, 0.85))
-        end
-      end
-      vim.schedule(settle)
-    end,
-  })
-  api.nvim_create_autocmd("WinClosed", {
-    group = group,
-    callback = function(ev)
-      settled[tonumber(ev.match)] = nil
     end,
   })
 

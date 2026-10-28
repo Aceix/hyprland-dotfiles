@@ -292,6 +292,7 @@ vim.api.nvim_create_autocmd("User", {
 require("utils.git_sidebar").setup()
 -- The symbol outline: in the side bar under the Explorer, or a right pane
 require("utils.outline_dock").setup()
+require("utils.sidebar_split").setup()
 -- Always an editor area beside the sidebar and above the bottom panel
 require("utils.layout").setup()
 -- Shortcut hints in an editor with no file open (utils/empty_state.lua)
@@ -397,3 +398,23 @@ require("utils.autoreload").setup()
 
 -- VS Code fold chevrons in the gutter, clickable (utils/fold_gutter.lua)
 require("utils.fold_gutter").setup()
+
+-- Plugin panes (the outline, the git panel, quickfix, Trouble, ...):
+-- double-click does what <CR> does there, as in VS Code. Panes that map the
+-- double-click themselves (nvim-tree, Neogit, utils/buf_mru.lua) keep theirs,
+-- and help keeps its tag jump.
+vim.api.nvim_create_autocmd({ "FileType", "BufWinEnter" }, {
+  group = vim.api.nvim_create_augroup("DoubleClickEnter", { clear = true }),
+  callback = function(ev)
+    local bt = vim.bo[ev.buf].buftype
+    if bt == "" or bt == "help" or bt == "terminal" or bt == "prompt" then
+      return
+    end
+    for _, map in ipairs(vim.api.nvim_buf_get_keymap(ev.buf, "n")) do
+      if map.lhs == "<2-LeftMouse>" then
+        return
+      end
+    end
+    vim.keymap.set("n", "<2-LeftMouse>", "<CR>", { buffer = ev.buf, remap = true, desc = "Same as <CR>" })
+  end,
+})
