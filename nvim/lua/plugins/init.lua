@@ -365,16 +365,6 @@ return {
   },
 
   {
-    "hedyhli/outline.nvim",
-    lazy = true,
-    cmd = { "Outline", "OutlineOpen" },
-    keys = {
-      { "<leader>co", "<cmd>Outline<CR>", desc = "Toggle Symbol Outline" },
-    },
-    opts = {},
-  },
-
-  {
     "folke/trouble.nvim",
     lazy = true,
     cmd = "Trouble",

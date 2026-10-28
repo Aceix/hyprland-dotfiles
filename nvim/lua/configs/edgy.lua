@@ -1,5 +1,6 @@
 -- edgy.nvim layout: VS Code's side bar. The left area holds either the
--- Explorer (nvim-tree) or Source Control (Neogit status + the GitLens-style
+-- Explorer (nvim-tree, with the symbol outline below it when docked there)
+-- or Source Control (Neogit status + the GitLens-style
 -- panel); utils/git_sidebar.lua keeps the two mutually exclusive and draws
 -- the clickable "Explorer | Source Control" tab strip in the top winbar.
 
@@ -52,8 +53,22 @@ return {
     {
       ft = "NvimTree",
       title = "Explorer",
-      size = { height = 1 }, -- the only view on screen in explorer mode
+      -- takes whatever the outline below leaves
       wo = { winbar = tabs },
+    },
+    {
+      -- utils/outline_dock.lua: only when docked in the side bar, where it
+      -- comes and goes with the Explorer (height resizable, kept across restarts)
+      ft = "Outline",
+      title = "Outline",
+      size = {
+        height = function()
+          return require("utils.outline_dock").height()
+        end,
+      },
+      filter = function()
+        return require("utils.outline_dock").dock() == "left"
+      end,
     },
     {
       ft = "NeogitStatus",

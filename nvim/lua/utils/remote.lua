@@ -391,7 +391,13 @@ local function ping(s)
   end
 end
 
-local function watchdog_tick()
+-- Ticks already queued by vim.schedule_wrap still run after the timer is
+-- stopped (they pile up while Neovim is blocked, e.g. on wake), so each tick
+-- only acts if its own timer is still the current one
+local function watchdog_tick(timer)
+  if watchdog.timer ~= timer then
+    return
+  end
   local now = os.time()
   local woke = watchdog.last and now - watchdog.last > 20
   watchdog.last = now
@@ -413,9 +419,11 @@ end
 
 local function watchdog_start()
   if not watchdog.timer then
-    watchdog.timer = assert(vim.uv.new_timer())
-    watchdog.last = os.time()
-    watchdog.timer:start(5000, 5000, vim.schedule_wrap(watchdog_tick))
+    local timer = assert(vim.uv.new_timer())
+    watchdog.timer, watchdog.last = timer, os.time()
+    timer:start(5000, 5000, vim.schedule_wrap(function()
+      watchdog_tick(timer)
+    end))
   end
 end
 

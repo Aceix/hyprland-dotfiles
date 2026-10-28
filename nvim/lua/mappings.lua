@@ -224,7 +224,7 @@ map({ "n", "v" }, "<leader>cf", function()
   require("conform").format { lsp_fallback = true }
 end, { desc = "Format Code" })
 
--- Symbols (<leader>co, the outline, is in plugins/outline.lua)
+-- Symbols (<leader>co / <leader>cO, the outline, are in plugins/outline.lua)
 map("n", "<leader>cs", "<cmd>Telescope lsp_document_symbols<cr>", { desc = "Document Symbols" })
 map("n", "<leader>cS", "<cmd>Telescope lsp_workspace_symbols<cr>", { desc = "Workspace Symbols" })
 
