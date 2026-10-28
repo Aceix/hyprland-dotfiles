@@ -26,7 +26,7 @@ end
 
 -- A server with no client for this long shuts itself down, so ones nobody
 -- comes back to don't pile up on the host (see keep_alive below).
-M.idle_shutdown_hours = 24
+M.idle_shutdown_hours = 3
 
 -- "42s", "3m 05s", "2h 14m"
 local function duration(ms)
