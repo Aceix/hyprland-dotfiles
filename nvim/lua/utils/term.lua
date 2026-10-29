@@ -16,13 +16,13 @@ local api = vim.api
 
 local M = {}
 
----@type { order: integer[], win: integer?, active: integer?, maximized: boolean, taken_down_by: integer?, height: integer? }
+---@type { order: integer[], win: integer?, active: integer?, maximized: boolean, taken_down_by: integer? }
 local state = {
   order = {}, -- terminal buffers, in tab order
   win = nil, -- the bottom pane window
   active = nil, -- buffer currently shown in the pane
   maximized = false, -- panel blown up to full height, whatever tab; see M.toggle_height()
-  height = nil, -- bottom panel height once resized, shared with Problems
+  -- (the panel's height, shared with Problems, is vim.g.PANEL_HEIGHT; see pane_height)
   -- Buffer that was on screen when the pane window went away by itself; see the
   -- TermClose/WinClosed pair at the bottom of this file.
   taken_down_by = nil,
@@ -222,12 +222,14 @@ end
 
 -- The one height every tab gets: as tall as Neovim allows while maximized
 -- (requests are clamped to the room there is), else the last one it was
--- resized to, else 30%
+-- resized to -- kept across restarts like the side bar's splits (an
+-- upper-case g: var, which shada's '!' keeps; utils/sidebar_split.lua) --
+-- else 30%
 local function pane_height()
   if state.maximized then
     return vim.o.lines
   end
-  return state.height or math.max(10, math.floor(vim.o.lines * 0.3))
+  return vim.g.PANEL_HEIGHT or math.max(10, math.floor(vim.o.lines * 0.3))
 end
 
 local function configure_win(win)
@@ -444,7 +446,7 @@ function M.owns(buf)
 end
 
 --- The bottom panel's height: everything while maximized, else the last one it
---- was resized to, else 30%.
+--- was resized to (kept across restarts), else 30%.
 M.height = pane_height
 
 --- Whether `buf` is the tab currently on screen in the pane.
@@ -661,39 +663,30 @@ api.nvim_create_autocmd("BufWinEnter", {
 
 -- Remember the bottom panel's height when it's resized (mouse drag, :resize),
 -- for the next terminal or list shown there -- the only place it's recorded.
--- Not when it grew or shrank because a window opened or closed next to it:
--- a tab switch opens the new tab's window first, so the old one is briefly
--- taller. (Floats -- hovers, notifications, completion menus -- reflow
--- nothing, and windows of another tab nothing here; either used to leave the
--- flag set so the next real resize was ignored.)
-local reflowed = false
-api.nvim_create_autocmd("TabEnter", {
-  group = group,
-  callback = function()
-    reflowed = false
-  end,
-})
-api.nvim_create_autocmd({ "WinNew", "WinClosed" }, {
-  group = group,
-  callback = function(args)
-    local win = args.event == "WinClosed" and tonumber(args.match) or api.nvim_get_current_win()
-    if win and api.nvim_win_is_valid(win) and api.nvim_win_get_config(win).relative == "" then
-      reflowed = true
-    end
-  end,
-})
+-- Not when it grew or shrank because a window opened or closed beside it (a
+-- tab switch opens the new tab's window first, so the old one is briefly
+-- taller), the screen changed size or the command line grew: a resize by
+-- hand leaves all of those as they were. (Floats -- hovers, notifications,
+-- completion menus -- reflow nothing, so they don't count.)
+local layouts = {} ---@type table<integer, string> tab page -> its splits and the screen at the last resize
 api.nvim_create_autocmd("WinResized", {
   group = group,
   callback = function()
-    if reflowed or state.maximized then
-      reflowed = false
+    local tab = api.nvim_get_current_tabpage()
+    local splits = vim.tbl_filter(function(win)
+      return api.nvim_win_get_config(win).relative == ""
+    end, api.nvim_tabpage_list_wins(tab))
+    local layout = ("%s %dx%d %d"):format(table.concat(splits, " "), vim.o.lines, vim.o.columns, vim.o.cmdheight)
+    local by_hand = layouts[tab] == layout
+    layouts[tab] = layout
+    if not by_hand or state.maximized then
       return
     end
     for _, win in ipairs(vim.v.event.windows or {}) do
       if api.nvim_win_is_valid(win) and M.is_panel_win(win) then
         local height = api.nvim_win_get_height(win)
         if height >= 3 then
-          state.height = height
+          vim.g.PANEL_HEIGHT = height
         end
       end
     end
