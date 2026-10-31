@@ -11,8 +11,8 @@ return {
 	programs = {
 		terminal = "kitty",
 		file_manager = "nautilus",
-		-- menu = "noctalia msg panel-toggle launcher",
-		menu = "wofi --show drun",
+		menu = "noctalia msg panel-toggle launcher",
+		-- menu = "wofi --show drun",
 		web_browser = "google-chrome-stable --disable-features=WaylandWpColorManagerV1",
 		code_editor = "code",
 		calculator = "gnome-calculator",
