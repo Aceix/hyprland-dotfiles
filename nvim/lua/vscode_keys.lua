@@ -69,7 +69,7 @@ map("n", "<S-F8>", function()
 end, { desc = "Previous Problem" })
 
 -- === Editing ================================================================
--- <C-/> under kitty's keyboard protocol, <C-_> in legacy terminals
+-- <C-/> under the kitty keyboard protocol (kitty, Ghostty), <C-_> in legacy terminals
 for _, key in ipairs { "<C-/>", "<C-_>" } do
   map("n", key, "gcc", { remap = true, desc = "Toggle Line Comment" })
   map("x", key, "gcgv", { remap = true, desc = "Toggle Line Comment" })
@@ -115,8 +115,9 @@ map("i", "<C-BS>", "<C-w>", { desc = "Delete Word Left" })
 
 -- === Layout & tabs ==========================================================
 -- One sidebar slot, Explorer or Source Control, as in VS Code's activity bar
--- (utils/git_sidebar.lua). <C-S-g> needs kitty to pass it through, see
--- the ctrl+shift+g line in ~/.config/kitty/kitty.conf.
+-- (utils/git_sidebar.lua). <C-S-g> reaches Neovim because neither kitty nor
+-- Ghostty binds ctrl+shift+g by default; the other Ctrl+Shift keys are
+-- unbound in ~/.config/kitty/vscode-keys.conf and ~/.config/ghostty/vscode-keys.ghostty.
 map(niv, "<C-b>", call("utils.git_sidebar", "toggle"), { desc = "Toggle Sidebar" })
 map(niv, "<C-S-e>", call("utils.git_sidebar", "show", "explorer"), { desc = "Show Explorer" })
 map(niv, "<C-S-g>", call("utils.git_sidebar", "show", "scm"), { desc = "Show Source Control" })

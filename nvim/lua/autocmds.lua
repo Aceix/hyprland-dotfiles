@@ -303,25 +303,25 @@ if require("settings").git_autofetch then
 end
 
 
--- auto (un)set kitty opacity
-local kitty_group = vim.api.nvim_create_augroup("SecureKittyTransparency", { clear = true })
+-- auto (un)set terminal opacity (kitty via its socket, Ghostty via config reload)
+local term_group = vim.api.nvim_create_augroup("SecureTerminalTransparency", { clear = true })
 local transparency = require "configs.transparency"
 
--- Only execute if Neovim detects it is running inside a socket-enabled Kitty window
-if vim.env.KITTY_LISTEN_ON then
+-- Only execute if Neovim detects a terminal whose opacity it can drive
+if transparency.supported() then
   -- Lower background opacity when entering Neovim
   vim.api.nvim_create_autocmd("VimEnter", {
-    group = kitty_group,
+    group = term_group,
     callback = function()
-      transparency.set_kitty_opacity(transparency.kitty_opacity)
+      transparency.set_terminal_opacity(transparency.terminal_opacity)
     end,
   })
 
   -- Restore fully opaque background when leaving Neovim
   vim.api.nvim_create_autocmd("VimLeave", {
-    group = kitty_group,
+    group = term_group,
     callback = function()
-      transparency.set_kitty_opacity(1.0)
+      transparency.set_terminal_opacity(1.0)
     end,
   })
 end
