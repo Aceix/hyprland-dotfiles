@@ -1,0 +1,27 @@
+# Hand these Ctrl+Shift keys to Neovim's VS Code layer
+# (~/.config/nvim/lua/vscode_keys.lua, toggled by lua/settings.lua).
+# Ghostty equivalent of ~/.config/kitty/vscode-keys.conf. Comment out the
+# `config-file = vscode-keys.ghostty` line in config.ghostty to give them back to
+# Ghostty. `unbind` removes Ghostty's binding so the key reaches the program.
+# Kept for Ghostty: ctrl+shift+c/v (copy/paste), t/w (tabs), n (window),
+# q (quit), a (select all), i (inspector), j (screen file), , (reload config).
+
+# command palette, search, explorer (default: new_split:down), symbols
+# (default: new_split:right), delete line, select all matches, problems,
+# insert line above (default: toggle_split_zoom)
+keybind = ctrl+shift+p=unbind
+keybind = ctrl+shift+f=unbind
+keybind = ctrl+shift+e=unbind
+keybind = ctrl+shift+o=unbind
+keybind = ctrl+shift+k=unbind
+keybind = ctrl+shift+l=unbind
+keybind = ctrl+shift+m=unbind
+keybind = ctrl+shift+enter=unbind
+# word select (ctrl+shift+left/right, default: previous/next_tab),
+# add cursor (ctrl+shift+up/down)
+keybind = ctrl+shift+up=unbind
+keybind = ctrl+shift+down=unbind
+keybind = ctrl+shift+left=unbind
+keybind = ctrl+shift+right=unbind
+# restart debugging
+keybind = ctrl+shift+f5=unbind
