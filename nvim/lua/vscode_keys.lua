@@ -59,7 +59,7 @@ map(niv, "<S-F12>", tele "lsp_references", { desc = "Find All References" })
 map(niv, "<C-F12>", tele "lsp_implementations", { desc = "Go to Implementation" })
 map(niv, "<F2>", vim.lsp.buf.rename, { desc = "Rename Symbol" })
 map(niv, "<C-.>", vim.lsp.buf.code_action, { desc = "Quick Fix / Code Action" })
-map("n", "<C-k><C-i>", vim.lsp.buf.hover, { desc = "Show Hover" })
+map("n", "<C-k><C-i>", call("utils.float_focus", "hover"), { desc = "Show Hover" })
 
 map("n", "<F8>", function()
   vim.diagnostic.jump { count = 1, float = true }

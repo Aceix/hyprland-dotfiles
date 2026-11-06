@@ -52,9 +52,21 @@ local function reveal(t)
   end)
 end
 
+-- The older file (by modification time) on the left, red, like every diff
+-- here (utils/diff.lua)
 local function compare(t)
-  vim.cmd.tabnew(vim.fn.fnameescape(compare_base))
-  vim.cmd("vertical diffsplit " .. vim.fn.fnameescape(t.path))
+  local function mtime(path)
+    local st = vim.uv.fs_stat(path)
+    return st and st.mtime.sec + st.mtime.nsec / 1e9 or 0
+  end
+  local old, new = compare_base, t.path
+  if mtime(old) > mtime(new) then
+    old, new = new, old
+  end
+  vim.cmd.tabnew(vim.fn.fnameescape(old))
+  local left = vim.api.nvim_get_current_win()
+  vim.cmd("rightbelow vertical diffsplit " .. vim.fn.fnameescape(new))
+  vim.wo[left].winhighlight = require("utils.diff").OLD_WINHL
 end
 
 local sep = { name = "separator" }

@@ -1047,7 +1047,7 @@ local SHARED = {
 -- Creates or re-syncs the folder entry for `dir` on `host_id`; returns its id
 local function save_folder(host_id, dir)
   local host = get(host_id)
-  local entry = { parent = host_id, folder = dir }
+  local entry = { parent = host_id, folder = dir, last_used = os.time() }
   for _, key in ipairs(SHARED) do
     entry[key] = host[key]
   end
@@ -1257,7 +1257,33 @@ function M.track_sessions()
       return attach(other)
     end
     self._rnvim_reconnect = running
+    if not vim.tbl_isempty(get(self.unique_host_id)) then -- a new host is saved later, by the plugin
+      self._config_provider:update_workspace_config(self.unique_host_id, { last_used = os.time() })
+    end
     return launch(self, ...)
+  end
+
+  -- The :RemoteStart "Connect to saved workspace" list, most recently used
+  -- first. The plugin lists them in table order (random), so its finder gets
+  -- them sorted.
+  local saved = require "telescope._extensions.choices.remote-nvim.existing_workspace"
+  local list = saved.action
+  saved.action = function(...)
+    local finders = require "telescope.finders"
+    local new_table = finders.new_table
+    finders.new_table = function(t)
+      table.sort(t.results, function(a, b)
+        local x, y = a.config.last_used or 0, b.config.last_used or 0
+        if x ~= y then
+          return x > y
+        end
+        return (a.display or "") < (b.display or "")
+      end)
+      return new_table(t)
+    end
+    local ok, err = pcall(list, ...)
+    finders.new_table = new_table
+    assert(ok, err)
   end
 
   local launch_client = Provider._launch_local_neovim_client

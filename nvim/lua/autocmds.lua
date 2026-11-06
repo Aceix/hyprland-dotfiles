@@ -290,6 +290,7 @@ vim.api.nvim_create_autocmd("User", {
 -- VS Code-style Source Control sidebar, GitLens panel and background fetch
 -- (utils/git_sidebar.lua, utils/git_panel.lua, utils/git_autofetch.lua)
 require("utils.git_sidebar").setup()
+require("utils.float_focus").setup()
 -- The symbol outline: in the side bar under the Explorer, or a right pane
 require("utils.outline_dock").setup()
 require("utils.sidebar_split").setup()

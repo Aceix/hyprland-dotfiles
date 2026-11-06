@@ -11,11 +11,15 @@ local function is_panel(win)
   return require("utils.git_sidebar").is_sidebar_win(win) or require("utils.term").is_panel_win(win)
 end
 
--- A window in the editor area: a file, an empty buffer or the dashboard
+-- A window in the editor area: a file, an empty buffer, the dashboard or a
+-- diff (a staged diff's sides are both scratch buffers)
 local function is_editor(win)
   local buf = api.nvim_win_get_buf(win)
   local bo = vim.bo[buf]
-  return bo.buflisted or bo.filetype == "nvdash" or (bo.buftype == "" and api.nvim_buf_get_name(buf) == "")
+  return bo.buflisted
+    or bo.filetype == "nvdash"
+    or (bo.buftype == "" and api.nvim_buf_get_name(buf) == "")
+    or vim.wo[win].diff
 end
 
 -- The most recently used listed buffer, else a new empty one

@@ -334,6 +334,7 @@ function M.setup()
   })
 
   vim.keymap.set("n", "<leader>rf", ":RemoteForward ", { desc = "Forward a remote port to local machine" })
+  vim.keymap.set("n", "<leader>rp", list, { desc = "List forwarded ports" })
 
   -- Don't leave tunnels running after Neovim exits
   vim.api.nvim_create_autocmd("VimLeavePre", {

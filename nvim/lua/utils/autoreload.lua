@@ -397,9 +397,11 @@ local function compare(buf)
     vim.bo[disk].syntax = vim.bo[buf].filetype
   end
 
-  vim.cmd "rightbelow vsplit"
+  -- disk on the left (red), your edits, the newer side, on the right
+  vim.cmd "leftabove vsplit"
   local disk_win = vim.api.nvim_get_current_win()
   vim.api.nvim_win_set_buf(disk_win, disk)
+  vim.wo[disk_win].winhighlight = require("utils.diff").OLD_WINHL
   vim.wo[disk_win].winbar = "%#WinBar# On disk   do/dp: move a hunk   q: close   :e! in your buffer takes this version"
   for _, w in ipairs { win, disk_win } do
     vim.api.nvim_win_call(w, function()

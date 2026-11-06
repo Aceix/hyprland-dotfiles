@@ -240,57 +240,15 @@ map("n", "<leader>cc", "<cmd>Telescope lsp_incoming_calls<cr>", { desc = "Call H
 map("n", "<leader>cC", "<cmd>Telescope lsp_outgoing_calls<cr>", { desc = "Caller Hierarchy (Outgoing)" })
 
 -- Hover & Diagnostics
--- The line's diagnostics in a float that <Esc> or q closes, from the code or
--- from inside the float. Those keys are only taken over while it's open: after
--- that <Esc> clears the search again and q records macros (and any map the
--- buffer had for them comes back).
-local diag_floats = {} -- code buffer -> its float window
+-- The line's diagnostics in a box the cursor moves into, closed by q / <Esc>
+-- (utils/float_focus.lua, like the hover)
 local function diagnostic_float()
-  local buf = vim.api.nvim_get_current_buf()
-  local float_buf, win = vim.diagnostic.open_float()
-  if not win or diag_floats[buf] == win then
-    return -- nothing on this line, or a second gl just went into the float
-  end
-  diag_floats[buf] = win
-
-  local keys, saved = { "<Esc>", "q" }, {}
-  for _, key in ipairs(keys) do
-    local m = vim.fn.maparg(key, "n", false, true)
-    saved[key] = m.buffer == 1 and m or nil
-  end
-  local function close()
-    if vim.api.nvim_win_is_valid(win) then
-      vim.api.nvim_win_close(win, true)
-    end
-  end
-  for _, b in ipairs { buf, float_buf } do
-    for _, key in ipairs(keys) do
-      map("n", key, close, { buffer = b, nowait = true, desc = "Close diagnostic float" })
-    end
-  end
-
-  -- However it closes (these keys, moving the cursor, ...), give the keys back
-  vim.api.nvim_create_autocmd("WinClosed", {
-    pattern = tostring(win),
-    once = true,
-    callback = function()
-      diag_floats[buf] = nil
-      vim.schedule(function()
-        if not vim.api.nvim_buf_is_valid(buf) then
-          return
-        end
-        for _, key in ipairs(keys) do
-          pcall(vim.keymap.del, "n", key, { buffer = buf })
-          if saved[key] then
-            vim.fn.mapset("n", false, saved[key])
-          end
-        end
-      end)
-    end,
-  })
+  local _, win = vim.diagnostic.open_float()
+  require("utils.float_focus").enter(win)
 end
 
-map("n", "<leader>ch", vim.lsp.buf.hover, { desc = "Hover Documentation" })
+map("n", "<leader>ch", call("utils.float_focus", "hover"), { desc = "Hover Documentation" })
+map("n", "K", call("utils.float_focus", "hover"), { desc = "Hover Documentation" })
 map("n", "<leader>ck", vim.lsp.buf.signature_help, { desc = "Signature Help" })
 map("n", "<leader>ce", diagnostic_float, { desc = "Line Diagnostics Float" })
 map("n", "<leader>cq", vim.diagnostic.setqflist, { desc = "Diagnostics Quickfix List" })
