@@ -1464,7 +1464,7 @@ local function handoff(s)
 end
 
 -- Quitting this Neovim with remote sessions running asks whether to close
--- them all or keep them running in their tabs (SSH socket sessions only;
+-- them all (N) or keep them running in their tabs (Y) (SSH socket sessions only;
 -- devpod and TCP-fallback servers end with their SSH connection regardless).
 -- Cancel aborts the quit, except a forced one (:qa!), which keeps them.
 function M.ask_on_quit()
@@ -1503,8 +1503,9 @@ function M.ask_on_quit()
       if #close > 0 then
         msg = msg .. ("\n(%s can't outlive this Neovim and will close either way)"):format(names(close))
       end
-      local n = vim.fn.confirm(msg, "&Close all\n&Keep running\n&Cancel", 2, "Question")
-      choice = ({ "close", "keep" })[n] or "cancel"
+      msg = msg .. "\nKeep them running? (Y: keep, N: stop them, C: cancel quit)"
+      local n = vim.fn.confirm(msg, "&Yes\n&No\n&Cancel", 1, "Question")
+      choice = ({ "keep", "close" })[n] or "cancel"
       if choice ~= "cancel" then
         return
       end

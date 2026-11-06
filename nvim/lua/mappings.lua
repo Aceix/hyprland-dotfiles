@@ -361,6 +361,7 @@ map("n", "<leader>uT", call("configs.transparency", "toggle"), { desc = "Toggle 
 map("n", "<leader>uf", call("utils.autoresize", "toggle"), { desc = "Toggle Window Auto-Resize" })
 map("n", "<leader>um", call("utils.maximize", "toggle"), { desc = "Maximize Split Window" })
 map("n", "<leader>ui", call("utils.svg_preview", "toggle"), { desc = "Toggle SVG Code/Preview" })
+map("n", "<leader>un", call("utils.messages", "show"), { desc = "Show All Messages" })
 -- Also flips the auto-open flag read by the MiniMapAutoOpen autocmd (see
 -- lua/autocmds.lua), so closing the map keeps it closed until toggled back on.
 map("n", "<leader>uM", function()

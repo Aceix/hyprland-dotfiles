@@ -43,3 +43,7 @@ vim.opt.keymodel = "startsel"
 -- dropped: empty and terminal windows are torn down in PersistenceSavePre.)
 vim.opt.sessionoptions = "curdir,folds,help,tabpages,winsize"
 
+
+-- Long messages pause briefly instead of a "Press ENTER" prompt, which blocks
+-- everything scheduled (e.g. port forwards asked for by a remote session)
+vim.opt.messagesopt = "wait:5000,history:500"
