@@ -310,6 +310,7 @@ if wk_ok then
     { "<leader>s", group = "Search & Replace" },
     { "<leader>d", group = "Debugger" },
     { "<leader>u", group = "UI Toggles" },
+    { "<leader>uB", group = "Bottom Panel Tabs" },
     { "<leader>t", group = "Terminal / Toggles" },
     { "<leader>T", group = "Tools" },
     { "<leader>g", group = "Git" },
@@ -340,8 +341,63 @@ map("n", "gl", diagnostic_float, { desc = "Open floating diagnostic message" })
 map("n", "[d", vim.diagnostic.goto_prev, { desc = "Previous Diagnostic" })
 map("n", "]d", vim.diagnostic.goto_next, { desc = "Next Diagnostic" })
 
+-- ]] / [[ jump to the next / previous use of the symbol under the cursor
+-- (snacks.words, plugins/snacks.lua), in buffers whose language server finds
+-- them. Set again after each ftplugin, as many (lua, python, go, rust, ...)
+-- map ]] / [[ themselves.
+local function words_keys(buf)
+  if not vim.api.nvim_buf_is_valid(buf) then
+    return
+  end
+  if #vim.lsp.get_clients { bufnr = buf, method = "textDocument/documentHighlight" } == 0 then
+    return
+  end
+  for lhs, dir in pairs { ["]]"] = 1, ["[["] = -1 } do
+    map("n", lhs, function()
+      require("snacks").words.jump(dir * vim.v.count1)
+    end, { buffer = buf, desc = dir > 0 and "Next Reference" or "Previous Reference" })
+  end
+end
+local words_group = vim.api.nvim_create_augroup("WordsKeys", { clear = true })
+vim.api.nvim_create_autocmd("LspAttach", {
+  group = words_group,
+  callback = function(ev)
+    words_keys(ev.buf)
+  end,
+})
+vim.api.nvim_create_autocmd("FileType", {
+  group = words_group,
+  callback = function(ev)
+    vim.schedule(function()
+      words_keys(ev.buf)
+    end)
+  end,
+})
+
 -- UI Layout & Toggles (<leader>u)
 map("n", "<leader>uW", "<cmd>Twilight<cr>", { desc = "Toggle Twilight Dimming" })
+map("n", "<leader>ub", call("utils.block_outline", "toggle"), { desc = "Toggle Block Outline" })
+
+-- Bottom panel tabs (<leader>uB): each list, opened (with a tab) if it has
+-- none yet, and the terminal (utils/term.lua)
+local term = require "utils.term"
+for key, mode in pairs {
+  p = "diagnostics",
+  q = "qflist",
+  l = "loclist",
+  r = "lsp_references",
+  d = "lsp_definitions",
+  i = "lsp_implementations",
+  y = "lsp_type_definitions",
+  c = "lsp_incoming_calls",
+  C = "lsp_outgoing_calls",
+  t = "todo",
+} do
+  map("n", "<leader>uB" .. key, function()
+    term.open_list(mode)
+  end, { desc = term.list_name(mode) })
+end
+map("n", "<leader>uBT", term.open_terminal, { desc = "Terminal" })
 map("n", "<leader>uw", "<cmd>set wrap!<cr>", { desc = "Toggle Line Wrap" })
 map("n", "<leader>uT", call("configs.transparency", "toggle"), { desc = "Toggle Transparency/Opaque" })
 map("n", "<leader>uf", call("utils.autoresize", "toggle"), { desc = "Toggle Window Auto-Resize" })

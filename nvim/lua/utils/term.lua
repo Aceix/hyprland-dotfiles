@@ -16,9 +16,12 @@ local api = vim.api
 
 local M = {}
 
----@type { order: integer[], win: integer?, active: integer?, maximized: boolean, taken_down_by: integer? }
+---@type { order: integer[], lists: string[], win: integer?, active: integer?, maximized: boolean, taken_down_by: integer? }
 local state = {
   order = {}, -- terminal buffers, in tab order
+  -- The lists' tabs, after the terminals': Problems always, then each list
+  -- opened this session (by Trouble mode), until it's closed (q, :cclose, ...)
+  lists = { "diagnostics" },
   win = nil, -- the bottom pane window
   active = nil, -- buffer currently shown in the pane
   maximized = false, -- panel blown up to full height, whatever tab; see M.toggle_height()
@@ -47,12 +50,16 @@ local function prune()
   end
 end
 
-local function index_of(buf)
-  for i, b in ipairs(state.order) do
-    if b == buf then
+local function index_in(list, value)
+  for i, v in ipairs(list) do
+    if v == value then
       return i
     end
   end
+end
+
+local function index_of(buf)
+  return index_in(state.order, buf)
 end
 
 function M.is_open()
@@ -63,14 +70,18 @@ local WINBAR = "%!v:lua.require'utils.term'.winbar()"
 
 -- The mode of a list sharing the pane's slot, nil for any other window: a
 -- bottom Trouble split (w:trouble; plugins/trouble.lua hands it to M.adopt) or
--- the native quickfix / location list window (adopted on BufWinEnter below)
+-- the native quickfix / location list window (adopted on BufWinEnter below),
+-- which shares its tab with Trouble's view of the same list
 local function list_mode(win)
   local t = vim.w[win].trouble
+  local mode
   if type(t) == "table" then
-    return t.type == "split" and t.position == "bottom" and t.mode or nil
+    mode = t.type == "split" and t.position == "bottom" and t.mode or nil
+  else
+    local kind = vim.fn.win_gettype(win)
+    mode = (kind == "quickfix" or kind == "loclist") and kind or nil
   end
-  local kind = vim.fn.win_gettype(win)
-  return (kind == "quickfix" or kind == "loclist") and kind or nil
+  return mode == "quickfix" and "qflist" or mode
 end
 
 -- The lists on screen in this tab (one, unless just opened)
@@ -83,16 +94,54 @@ function M.is_panel_win(win)
   return win == state.win or list_mode(win) ~= nil
 end
 
-local problems_label =
-  { diagnostics = "Problems", qflist = "Quickfix", quickfix = "Quickfix", loclist = "Location List" }
+-- A list's tab name; the ones not named here after their mode
+-- (lsp_incoming_calls: "Incoming Calls")
+local list_names = { diagnostics = "Problems", qflist = "Quickfix", loclist = "Location List", todo = "TODOs" }
+function M.list_name(mode)
+  local words = mode:gsub("^lsp_", ""):gsub("_", " ")
+  return list_names[mode] or (words:gsub("%f[%w]%l", string.upper))
+end
 
--- The Trouble tabs: Problems always, another bottom list while it's shown
-local function lists_shown(mode)
-  local lists = { "diagnostics" }
-  if mode and mode ~= "diagnostics" then
-    lists[2] = mode
+-- Item counts of the lists as Trouble last showed them (M.set_count), and
+-- whether there are diagnostics (kept on DiagnosticChanged, below)
+local counts = {} ---@type table<string, integer>
+local has_diagnostics ---@type boolean?
+
+function M.set_count(mode, n)
+  counts[mode == "quickfix" and "qflist" or mode] = n
+end
+
+-- Whether a list has anything to show: one with nothing gets no tab, unless
+-- it's the one on screen
+local function has_items(mode)
+  if mode == "diagnostics" then
+    if has_diagnostics == nil then
+      has_diagnostics = next(vim.diagnostic.count()) ~= nil
+    end
+    return has_diagnostics
+  elseif mode == "qflist" then
+    return vim.fn.getqflist({ size = 0 }).size > 0
   end
-  return lists
+  return (counts[mode] or 0) > 0
+end
+
+-- The tabs in bar order: the terminals (buffers), then the lists with a tab
+-- (modes); `shown` is the list on screen
+local function tabs(shown)
+  local ret = vim.list_slice(state.order)
+  for _, mode in ipairs(state.lists) do
+    if mode == shown or has_items(mode) then
+      ret[#ret + 1] = mode
+    end
+  end
+  return ret
+end
+
+-- Closes a list on its way out of the pane's slot (another tab shown), as
+-- opposed to closed for good, which takes its tab with it (WinClosed below)
+local function put_away(win)
+  vim.w[win].nvterm_switch = true
+  pcall(api.nvim_win_close, win, false)
 end
 
 --- Highlights ---------------------------------------------------------------
@@ -128,6 +177,7 @@ local icon = {
   new = "", -- nf-fa-plus
   output = vim.fn.nr2char(0xeb9d), -- codicon output, for named (non-shell) tabs
   problems = vim.fn.nr2char(0xea6c), -- codicon warning
+  list = vim.fn.nr2char(0xeb17), -- codicon list-unordered, the other lists
 }
 
 -- Non-shell tabs (e.g. utils/test_results.lua's "Test Results") are terminal
@@ -169,11 +219,13 @@ function M.winbar()
     used = used + vim.fn.strwidth(text)
   end
 
-  for i, mode in ipairs(lists_shown(problems)) do
-    local text = (" %s %s "):format(icon.problems, problems_label[mode] or mode)
-    local hl = mode == problems and "%#TbBufOn#" or "%#TbBufOff#"
-    parts[#parts + 1] = ("%s%%%d@v:lua.__nvterm_problems@%s%%X"):format(hl, i, text)
-    used = used + vim.fn.strwidth(text)
+  for i, mode in ipairs(state.lists) do
+    if mode == problems or has_items(mode) then
+      local text = (" %s %s "):format(mode == "diagnostics" and icon.problems or icon.list, M.list_name(mode))
+      local hl = mode == problems and "%#TbBufOn#" or "%#TbBufOff#"
+      parts[#parts + 1] = ("%s%%%d@v:lua.__nvterm_problems@%s%%X"):format(hl, i, text)
+      used = used + vim.fn.strwidth(text)
+    end
   end
 
   local new_btn = " " .. icon.new .. " "
@@ -208,13 +260,30 @@ function _G.__nvterm_new()
   M.new()
 end
 
--- 1: Problems, 2: the other Trouble list, already on screen
-function _G.__nvterm_problems(which)
-  local win = list_wins()[1]
-  if which == 2 and win then
-    api.nvim_set_current_win(win)
+--- Show the list `mode` (a Trouble mode) in the pane, focused: the one on
+--- screen, else opened, which gives it a tab if it has none yet.
+function M.open_list(mode)
+  for _, win in ipairs(list_wins()) do
+    if list_mode(win) == mode then
+      return api.nvim_set_current_win(win)
+    end
+  end
+  vim.cmd(("Trouble %s open focus=true"):format(mode))
+end
+
+-- A tab from tabs(): a terminal's buffer or a list's mode
+local function show_tab(tab)
+  if type(tab) == "number" then
+    M.focus(tab)
   else
-    vim.cmd "Trouble diagnostics open focus=true"
+    M.open_list(tab)
+  end
+end
+
+-- The i-th list in state.lists
+function _G.__nvterm_problems(i)
+  if state.lists[i] then
+    M.open_list(state.lists[i])
   end
 end
 
@@ -265,7 +334,7 @@ local function ensure_pane()
 
   -- One view at a time: the terminals replace a list
   for _, win in ipairs(list_wins()) do
-    pcall(api.nvim_win_close, win, false)
+    put_away(win)
   end
 
   vim.cmd("botright " .. pane_height() .. "split")
@@ -414,6 +483,10 @@ end
 --- bar, with the pane put away until a terminal is shown again. Called by
 --- plugins/trouble.lua and for the native quickfix / location list below.
 function M.adopt(win)
+  local mode = list_mode(win)
+  if mode and not index_in(state.lists, mode) then
+    state.lists[#state.lists + 1] = mode
+  end
   vim.wo[win].winbar = WINBAR
   vim.wo[win].winfixheight = true
   vim.wo[win].winfixwidth = false -- (Trouble's) it spans the editor column
@@ -424,7 +497,7 @@ function M.adopt(win)
   close_pane(true)
   for _, other in ipairs(list_wins()) do
     if other ~= win then
-      pcall(api.nvim_win_close, other, false)
+      put_away(other)
     end
   end
   -- Focused first, like a terminal tab: maximized, the current window keeps a
@@ -476,6 +549,12 @@ function M.toggle()
     return
   end
 
+  M.open_terminal()
+end
+
+--- Show the terminal tab last shown, starting a shell if there's none.
+function M.open_terminal()
+  prune()
   if state.active then
     M.focus(state.active)
   else
@@ -499,42 +578,70 @@ function M.toggle_height()
   end
 end
 
---- Cycle through the bottom panel's tabs, terminals then Problems, from the
+--- Cycle through the bottom panel's tabs, terminals then lists, from the
 --- one shown in the current window; `step` is +1 / -1.
 function M.cycle(step)
   prune()
-  local cur = api.nvim_get_current_win()
-  local mode = list_mode(cur)
-
-  local tabs = vim.list_extend(vim.list_slice(state.order), lists_shown(mode))
-  local idx = mode and #state.order + (mode == "diagnostics" and 1 or 2) or index_of(state.active) or 1
-  local tab = tabs[(idx - 1 + step) % #tabs + 1]
-  if type(tab) == "number" then
-    M.focus(tab)
-  elseif tab ~= mode then
-    _G.__nvterm_problems(tab == "diagnostics" and 1 or 2)
+  local mode = list_mode(api.nvim_get_current_win())
+  local all = tabs(mode)
+  if #all == 0 then
+    return
+  end
+  local idx = index_in(all, mode or state.active) or 1
+  local tab = all[(idx - 1 + step) % #all + 1]
+  if tab ~= mode then
+    show_tab(tab)
   end
 end
 
--- Drop one tab and show its neighbour, or close the pane if it was the last.
+-- The tab after `tab` (to its right, else its left) in `all`, to show when
+-- `tab` closes
+local function neighbour(all, tab)
+  local i = index_in(all, tab)
+  return i and (all[i + 1] or all[i - 1])
+end
+
+local editing = false -- the next native quickfix / location list stays one
+
+--- The editable quickfix / location list (quicker.nvim) in place of
+--- Trouble's view of it (its `e` key), for the list of window `win`.
+---@param mode string Trouble's mode: "qflist" / "quickfix" or "loclist"
+function M.edit_list(mode, win)
+  if win and api.nvim_win_is_valid(win) then
+    api.nvim_set_current_win(win)
+  end
+  editing = true
+  local ok, err = pcall(vim.cmd, mode == "loclist" and "lopen" or "copen")
+  if not ok then
+    editing = false
+    vim.notify(err, vim.log.levels.WARN)
+  end
+end
+
+-- Drop a terminal's tab. On screen, the tab next to it (a list too) takes its
+-- place, or the pane closes with the last tab.
 local function remove(buf)
+  local next_tab = neighbour(tabs(), buf)
+  local shown = M.is_showing(buf) or state.taken_down_by == buf
   local idx = index_of(buf)
   if idx then
     table.remove(state.order, idx)
-    state.active = state.order[math.min(idx, #state.order)]
+  end
+  if state.active == buf then
+    state.active = type(next_tab) == "number" and next_tab or nil
   end
   prune()
 
-  if state.active then
-    if M.is_open() then
-      api.nvim_win_set_buf(state.win, state.active)
-    elseif state.taken_down_by == buf then
-      -- Neovim deleted this shell's buffer out from under us and the pane went
-      -- with it; the surviving tabs still want a pane, so put it back.
-      M.focus(state.active)
+  if shown then
+    if type(next_tab) == "number" and M.is_open() then
+      api.nvim_win_set_buf(state.win, next_tab)
+    elseif next_tab then
+      -- (also when Neovim deleted this shell's buffer out from under us and
+      -- the pane went with it)
+      show_tab(next_tab)
+    else
+      close_pane()
     end
-  else
-    close_pane()
   end
   state.taken_down_by = nil
 
@@ -543,7 +650,7 @@ local function remove(buf)
   end
 end
 
---- Kill the terminal in the current tab, closing the pane with the last one.
+--- Kill the terminal in the current tab; the tab next to it takes its place.
 function M.close()
   prune()
 
@@ -574,6 +681,21 @@ api.nvim_create_autocmd("User", {
   end,
 })
 
+-- The lists' tabs come and go with their items (has_items)
+api.nvim_create_autocmd({ "DiagnosticChanged", "QuickFixCmdPost" }, {
+  group = group,
+  callback = function(args)
+    if args.event == "DiagnosticChanged" then
+      has_diagnostics = nil
+    end
+    for _, win in ipairs(api.nvim_tabpage_list_wins(0)) do
+      if M.is_panel_win(win) then
+        api.nvim__redraw { win = win, winbar = true }
+      end
+    end
+  end,
+})
+
 -- A shell that exits takes its tab with it.
 --
 -- Neovim's own `nvim.terminal` TermClose autocmd deletes the buffer of a shell
@@ -597,6 +719,24 @@ api.nvim_create_autocmd("WinClosed", {
   callback = function(args)
     local win = tonumber(args.match)
     if win ~= state.win then
+      -- A list closed from inside it (q, :q, ...) loses its tab (Problems
+      -- keeps its own while it has items), and the tab next to it takes its
+      -- place. Not one put away for another tab, nor closed from elsewhere
+      -- (:only, :cclose in the code): that one just goes off screen.
+      local mode = win and list_mode(win)
+      local inside = win == api.nvim_get_current_win() or vim.w[win].nvterm_close -- (plugins/trouble.lua)
+      if mode and not vim.w[win].nvterm_switch and inside then
+        local next_tab = neighbour(tabs(mode), mode)
+        local i = mode ~= "diagnostics" and index_in(state.lists, mode)
+        if i then
+          table.remove(state.lists, i)
+        end
+        if next_tab then
+          vim.schedule(function()
+            show_tab(next_tab)
+          end)
+        end
+      end
       return
     end
 
@@ -641,21 +781,35 @@ api.nvim_create_autocmd("BufWinEnter", {
   end,
 })
 
--- The native quickfix / location list window (:copen, :lopen, quicker.nvim,
--- ...) is a list tab too. Neovim re-enters its buffer on every list refresh
--- (:make, :grep, ...) and a few times per open, so only a window not marked
--- yet is new. (A mark, not the winbar: a split copies the winbar of the window
--- it's split from, e.g. :copen from Problems, but not w: variables.)
+-- The native quickfix / location list window (:copen, :lopen, Telescope's
+-- <C-q>, ...) is shown as Trouble's view of that list, like every other list,
+-- unless asked for to edit it (M.edit_list); then it's a list tab itself.
+-- Neovim re-enters its buffer on every list refresh (:make, :grep, ...) and a
+-- few times per open, so only a window not marked yet is new. (A mark, not the
+-- winbar: a split copies the winbar of the window it's split from, e.g. :copen
+-- from Problems, but not w: variables.)
 api.nvim_create_autocmd("BufWinEnter", {
   group = group,
   callback = function(args)
     local win = api.nvim_get_current_win()
     if vim.bo[args.buf].buftype == "quickfix" and list_mode(win) then
       vim.schedule(function()
-        if api.nvim_win_is_valid(win) and not vim.w[win].nvterm_list then
-          vim.w[win].nvterm_list = true
-          M.adopt(win)
+        if not api.nvim_win_is_valid(win) or vim.w[win].nvterm_list then
+          return
         end
+        vim.w[win].nvterm_list = true
+        if editing then
+          editing = false
+          return M.adopt(win)
+        end
+        local mode = list_mode(win)
+        -- (Trouble's location list is the one of the window it's opened from)
+        local owner = mode == "loclist" and vim.fn.getloclist(win, { filewinid = 0 }).filewinid
+        put_away(win)
+        if owner and api.nvim_win_is_valid(owner) then
+          api.nvim_set_current_win(owner)
+        end
+        vim.cmd(("Trouble %s open focus=true"):format(mode))
       end)
     end
   end,

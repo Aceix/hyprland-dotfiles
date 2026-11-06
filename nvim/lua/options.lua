@@ -9,6 +9,8 @@ vim.opt.relativenumber = true -- (NvChad already turns on number)
 -- Use Treesitter syntax parsing engine to calculate code folds
 vim.opt.foldmethod = "expr"
 vim.opt.foldexpr = "v:lua.vim.treesitter.foldexpr()"
+-- ... or the language server's, where Treesitter has no parser
+require("utils.lsp_folds").setup()
 
 -- Prevent Neovim from opening files with everything automatically folded closed
 vim.opt.foldlevel = 99

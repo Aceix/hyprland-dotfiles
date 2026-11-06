@@ -1,3 +1,15 @@
+-- Quickfix / location list: `e` swaps Trouble's view (what :copen / :lopen
+-- show, utils/term.lua) for the editable one (quicker.nvim)
+local edit = {
+  e = {
+    action = function(view)
+      local main = view:main()
+      require("utils.term").edit_list(view.opts.mode, main and main.win)
+    end,
+    desc = "Edit the List",
+  },
+}
+
 return {
   "folke/trouble.nvim",
   cmd = "Trouble",
@@ -13,6 +25,8 @@ return {
           { "filename", format = "{file_icon} {basename} {count}" },
         },
       },
+      qflist = { keys = edit },
+      loclist = { keys = edit },
     },
   },
   config = function(_, opts)
@@ -65,11 +79,27 @@ return {
       return node(self, n, ...)
     end
 
-    -- Like VS Code's panel, an empty list says so instead of staying blank
     local View = require "trouble.view"
+
+    -- Closed from inside it (q, ...), a bottom list gives up its tab
+    -- (utils/term.lua); Trouble moves to the code window before closing it
+    local close = View.close
+    function View:close()
+      if self.win:valid() and vim.api.nvim_get_current_win() == self.win.win then
+        vim.w[self.win.win].nvterm_close = true
+      end
+      return close(self)
+    end
+
+    -- Like VS Code's panel, an empty list says so instead of staying blank
     local render = View.render
     function View:render()
-      if not (self.win:valid() and self:count() == 0) then
+      local count = self:count()
+      if self.win:valid() then
+        -- what decides whether the list gets a tab in the bottom panel
+        require("utils.term").set_count(self.opts.mode, count)
+      end
+      if not (self.win:valid() and count == 0) then
         if self.win:valid() and self.renderer._seen == nil then
           keep_folds(self)
         end

@@ -6,7 +6,7 @@
 local M = {}
 
 M.base46 = {
-	theme = "dark_horizon",
+	theme = "scaryforest",
   transparency = true,
 
   -- neotest isn't in base46's default set; loading it themes the test
@@ -43,6 +43,17 @@ M.base46 = {
     DiffChange = { fg = "NONE", bg = { "green", "black", 88 } },
     DiffText = { fg = "NONE", bg = { "green", "black", 60 } },
     DiffDelete = { fg = "one_bg3", bg = "NONE", bold = false },
+
+    -- The cursor's line, a soft band like VS Code's. Transparency clears
+    -- this background otherwise.
+    CursorLine = { bg = "black2" },
+    CursorLineNr = { fg = "white", bold = true },
+
+    -- Other uses of the symbol under the cursor (snacks.words), tinted with
+    -- the theme's blue like the current block's guide
+    LspReferenceText = { bg = { "blue", "black", 75 } },
+    LspReferenceRead = { bg = { "blue", "black", 75 } },
+    LspReferenceWrite = { bg = { "blue", "black", 75 } },
 	},
 
   -- Statusline groups the base46 statusline integration doesn't predefine,
@@ -76,6 +87,11 @@ M.base46 = {
     GitPanelTag = { fg = "yellow" },
     GitPanelStash = { fg = "purple" },
     GitPanelDim = { fg = "light_grey", italic = true },
+    -- Indent guides, and the current block's guide / outline in the theme's
+    -- blue (plugins/snacks.lua)
+    SnacksIndent = { fg = "line" },
+    SnacksIndentScope = { fg = "blue" },
+    SnacksIndentChunk = { fg = "blue" },
     -- The old side of a diff, red (see DiffAdd above)
     DiffOldAdd = { bg = { "red", "black", 78 } },
     DiffOldChange = { bg = { "red", "black", 88 } },
