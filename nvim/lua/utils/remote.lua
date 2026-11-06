@@ -268,6 +268,12 @@ end
 -- Socket sessions by short id (a hash of the workspace id), for reattach()
 local sessions = {}
 
+-- Exists while a session's tunnel runs detached from any Neovim, after you
+-- quit and chose to keep it (see handoff); its client tab watches for it
+local function kept_mark(key)
+  return vim.fn.stdpath "cache" .. "/remote-nvim-kept-" .. key
+end
+
 -- Runs `code` (with `args` as ...) on the server at `addr`, fire-and-forget.
 -- Never a request: one through a tunnel that died silently would wait for an
 -- answer forever and hang this Neovim. Connecting is instant either way (ssh
@@ -489,6 +495,9 @@ function M.secure_launch()
     end
 
     sessions[key] = self
+    -- tabs kept from an earlier Neovim close once this launch takes over
+    os.remove(kept_mark(key))
+    self._rnvim_launch = { cmd = new_cmd, opts = new_opts }
     self._rnvim_key, self._rnvim_ready, self._rnvim_reused = key, false, false
     self._rnvim_gone, self._rnvim_stopping = nil, nil
     -- A launch that isn't a reconnect gets its own client tab; tabs of an
@@ -612,7 +621,13 @@ end
 --           left on purpose (:detach) while the connection is fine: close
 --   "wait"  reconnecting: ask again shortly
 --   <port>  the tunnel is back: attach to localhost:<port>
+--   "kept"  this Neovim is quitting and a detached tunnel takes over the
+--           port: attach to it on your own from now on
 function M.reattach(key, gen)
+  -- this Neovim is quitting and handed the tunnels off (see ask_on_quit)
+  if M.kept then
+    return "kept"
+  end
   local s = sessions[key]
   if not s or s._rnvim_gone or gen ~= s._rnvim_gen then
     if s then
@@ -730,10 +745,22 @@ local function client_script()
   local path = vim.fn.stdpath "cache" .. "/remote-nvim-client.sh"
   vim.fn.writefile({
     "# Remote Neovim client tab (utils/remote.lua): reattaches after a dropped connection",
-    'nv=$1 here=$2 port=$3 key=$4 gen=$5 host=$6',
+    'nv=$1 here=$2 port=$3 key=$4 gen=$5 host=$6 mark=$7',
     -- headless with no tty on stdin, or it starts a UI and its escape codes end up in $r
     "ask() { \"$nv\" --clean --headless --server \"$here\" --remote-expr "
       .. "\"v:lua.require'utils.remote'.reattach('$key', $gen)\" </dev/null 2>/dev/null; }",
+    "# The Neovim you connected from quit and kept this session ($mark exists while the",
+    "# detached tunnel runs): wait up to 20s for the port to answer again. Kept tabs",
+    "# don't ask that Neovim again; a later :RemoteStart there would answer for its own tabs.",
+    "kept=",
+    "attach_kept() {",
+    '  [ -f "$mark" ] || return 1',
+    '  kept=1; printf \'%s[H%s[2J%sKeeping the session to %s running…%s\' "$esc" "$esc" "$D" "$host" "$R"',
+    '  i=0; while [ -f "$mark" ] && [ $i -lt 100 ]; do',
+    '    "$nv" --clean --headless --server "localhost:$port" --remote-expr 1 </dev/null >/dev/null 2>&1 && return 0',
+    "    sleep 0.2; i=$((i + 1))",
+    "  done; return 1",
+    "}",
     'spin="⠋ ⠙ ⠹ ⠸ ⠼ ⠴ ⠦ ⠧ ⠇ ⠏"',
     "esc=$(printf '\\033')",
     'B="$esc[1m" D="$esc[2m" Y="$esc[33m" R="$esc[0m"',
@@ -766,10 +793,12 @@ local function client_script()
     '  "$nv" --server "localhost:$port" --remote-ui',
     "  lost_at=$(date +%s); tick=0; need=; attempt=; what=",
     "  sleep 1",
-    "  r=$(ask) || exit 0",
+    '  if [ -n "$kept" ]; then attach_kept && continue; exit 0; fi',
+    "  r=$(ask) || { attach_kept && continue; exit 0; }",
     "  while :; do",
     '    case "$r" in',
     "      gone) exit 0 ;;",
+    "      kept) attach_kept && continue 2; exit 0 ;;",
     '      input*) need=${r#input }; what= ;;',
     '      wait*) need=; i=${r#wait}; i=${i# }; attempt=${i%% *}; what=${i#* }; [ "$what" = "$i" ] && what= ;;',
     '      "") ;;',
@@ -1145,7 +1174,7 @@ open_tab = function(port, workspace, folder, session)
     -- a server that survives dropped connections gets a tab that reattaches
     client = {
       "bash", client_script(), vim.v.progpath, vim.v.servername, tostring(port), session._rnvim_key, tostring(session._rnvim_gen),
-      session.host or "the host",
+      session.host or "the host", kept_mark(session._rnvim_key),
     }
   end
 
@@ -1377,6 +1406,127 @@ function M.refresh(host_id)
       offer_restart(host_id)
     end)
   end, ("Refreshing config on %s"):format(host_id))
+end
+
+-- A socket session's tunnel is an ssh job of this Neovim, so quitting ends it
+-- and its tab closes. To keep the tab connected, the same launch runs again
+-- detached from this Neovim: once this one's ssh is gone (the local port frees
+-- up; until then ExitOnForwardFailure makes ssh give up at once, and it's
+-- retried) it reuses the server and holds the tunnel until the server quits.
+-- It has no tty to answer prompts on, so it needs key/agent auth, and nothing
+-- reconnects it after a drop: kept_mark disappears and the tab closes, with
+-- the server still running for :RemoteStart.
+local function handoff(s)
+  local mark = kept_mark(s._rnvim_key)
+  vim.fn.mkdir(vim.fs.dirname(mark), "p")
+  if not pcall(vim.fn.writefile, {}, mark) then
+    return false
+  end
+  local opts = s._rnvim_launch.opts:gsub("^%-t ", "-T -n -o BatchMode=yes -o ExitOnForwardFailure=yes ")
+  local ssh = s.executor:_build_run_command(s._rnvim_launch.cmd, { additional_conn_opts = opts })
+  local script = table.concat({
+    "m=" .. vim.fn.shellescape(mark) .. "; i=0",
+    'while [ -f "$m" ] && [ $i -lt 50 ]; do',
+    "  t=$(date +%s); " .. ssh .. " </dev/null >/dev/null 2>&1",
+    '  [ $? -eq 255 ] && [ $(( $(date +%s) - t )) -lt 5 ] || break',
+    "  sleep 0.2; i=$((i + 1))",
+    "done",
+    'rm -f "$m"',
+  }, "\n")
+  log("keeping %s after quit", s.unique_host_id)
+  return pcall(vim.system, { "sh", "-c", script }, { detach = true, stdout = false, stderr = false })
+end
+
+-- Quitting this Neovim with remote sessions running asks whether to close
+-- them all or keep them running in their tabs (SSH socket sessions only;
+-- devpod and TCP-fallback servers end with their SSH connection regardless).
+-- Cancel aborts the quit, except a forced one (:qa!), which keeps them.
+function M.ask_on_quit()
+  local choice
+  local group = vim.api.nvim_create_augroup("RemoteAskOnQuit", { clear = true })
+
+  local function running()
+    local keep, close = {}, {}
+    for _, s in pairs(require("remote-nvim").session_provider:get_all_sessions()) do
+      if s:is_remote_server_running() then
+        local ok = s.provider_type == "ssh" and s._rnvim_key and s._rnvim_launch and s._rnvim_ready
+        table.insert(ok and keep or close, s)
+      end
+    end
+    return keep, close
+  end
+
+  local function names(list)
+    return table.concat(
+      vim.tbl_map(function(s)
+        return s.host or s.unique_host_id
+      end, list),
+      ", "
+    )
+  end
+
+  vim.api.nvim_create_autocmd("ExitPre", {
+    group = group,
+    callback = function()
+      choice = nil
+      local keep, close = running()
+      if #keep + #close == 0 or #vim.api.nvim_list_uis() == 0 then
+        return
+      end
+      local msg = "Remote sessions running: " .. names(vim.list_extend(vim.list_slice(keep), close))
+      if #close > 0 then
+        msg = msg .. ("\n(%s can't outlive this Neovim and will close either way)"):format(names(close))
+      end
+      local n = vim.fn.confirm(msg, "&Close all\n&Keep running\n&Cancel", 2, "Question")
+      choice = ({ "close", "keep" })[n] or "cancel"
+      if choice ~= "cancel" then
+        return
+      end
+      -- ExitPre can't abort; a modified buffer can (E37). Gone right after.
+      local blocker = vim.api.nvim_create_buf(false, true)
+      vim.bo[blocker].buftype = ""
+      vim.bo[blocker].modified = true
+      vim.schedule(function()
+        pcall(vim.api.nvim_buf_delete, blocker, { force = true })
+        vim.api.nvim_echo({ { "Quit cancelled" } }, false, {})
+      end)
+    end,
+  })
+
+  vim.api.nvim_create_autocmd("VimLeavePre", {
+    group = group,
+    callback = function()
+      if not choice then
+        return
+      end
+      local keep, close = running()
+      if choice == "close" then
+        -- Socket servers outlive their tunnel, so ask each to quit and wait
+        -- for its ssh to end on its own (the launcher exits with the server);
+        -- stop_neovim would kill the tunnel before the message gets through
+        for _, s in ipairs(keep) do
+          s._rnvim_stopping = true
+          stop_server(s:get_local_neovim_server_port())
+        end
+        vim.wait(5000, function()
+          for _, s in ipairs(keep) do
+            if s:is_remote_server_running() then
+              return false
+            end
+          end
+          return true
+        end, 50)
+        for _, s in ipairs(vim.list_extend(keep, close)) do
+          pcall(s.stop_neovim, s)
+        end
+        return
+      end
+      M.kept = true
+      for _, s in ipairs(keep) do
+        handoff(s)
+      end
+    end,
+  })
 end
 
 return M

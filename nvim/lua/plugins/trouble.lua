@@ -5,6 +5,15 @@ return {
     -- An empty list opens too, with a note (below), instead of a warning
     open_no_results = true,
     warn_no_results = false,
+    modes = {
+      -- Problems grouped by severity, then file (see the fold state below)
+      diagnostics = {
+        groups = {
+          { "severity", format = "{severity_icon} {severity} {count}" },
+          { "filename", format = "{file_icon} {basename} {count}" },
+        },
+      },
+    },
   },
   config = function(_, opts)
     require("trouble").setup(opts)
@@ -26,12 +35,49 @@ return {
       end
     end
 
+    -- Lists open with only their top level expanded (Problems: the
+    -- severities, their files collapsed), the first time each list opens in
+    -- this session; after that, what you expand or collapse stays as it was,
+    -- though Trouble builds a fresh view on every open. Groups that show up
+    -- later start collapsed too, unless you've opened everything (zR).
+    local Render = require "trouble.view.render"
+    local fold_state = {} -- by mode + filter
+    local function keep_folds(view)
+      local key = view.opts.mode .. vim.inspect(view.opts.filter or {})
+      local st = fold_state[key] or { folded = {}, seen = {} }
+      fold_state[key], view._fold_state = st, st
+      view.renderer._folded, view.renderer._seen = st.folded, st.seen
+      -- Set before Trouble's own first-fold pass, which re-renders through
+      -- its throttle and loses that render. Render:node folds instead.
+      view.renderer.foldlevel = st.level or 1
+    end
+
+    -- A group seen for the first time is folded if it's deeper than the
+    -- fold level (on the first render, that's every one below the top)
+    local node = Render.node
+    function Render:node(n, ...)
+      if self._seen and not n:is_leaf() and not self._seen[n.id] then
+        self._seen[n.id] = true
+        if self.foldlevel and n:depth() > self.foldlevel then
+          self._folded[n.id] = true
+        end
+      end
+      return node(self, n, ...)
+    end
+
     -- Like VS Code's panel, an empty list says so instead of staying blank
     local View = require "trouble.view"
     local render = View.render
     function View:render()
       if not (self.win:valid() and self:count() == 0) then
-        return render(self)
+        if self.win:valid() and self.renderer._seen == nil then
+          keep_folds(self)
+        end
+        local ret = render(self)
+        if self._fold_state then
+          self._fold_state.level = self.renderer.foldlevel
+        end
+        return ret
       end
       local text = self.opts.mode == "diagnostics" and "No problems have been detected in the workspace."
         or "No results."

@@ -27,6 +27,7 @@ return {
     remote.keep_progress_view()
     remote.secure_launch()
     remote.track_sessions()
+    remote.ask_on_quit()
 
     vim.api.nvim_create_user_command("RemoteReconnect", remote.reconnect, {
       desc = "Retry a reconnect that's waiting for a password / passphrase / 2FA code",
