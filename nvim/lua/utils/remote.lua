@@ -119,10 +119,40 @@ local function keep_alive(dir)
   arm()
 end
 
+-- Yanks go to this machine's clipboard as OSC 52 escape sequences, through
+-- the terminal the client runs in, so the host needs no clipboard tool (and a
+-- broken one there, e.g. xclip with no X display, can't fail every yank).
+-- Neovim only picks OSC 52 itself when 'clipboard' is empty, and NvChad sets
+-- it to unnamedplus. Pasting asks the terminal for nothing (slow, and many
+-- terminals prompt each time): p gives back the last yank here, and Cmd+V
+-- pastes the local clipboard.
+local function copy_over_osc52()
+  local osc52 = require "vim.ui.clipboard.osc52"
+  local last = { {}, "v" }
+  local function copy(reg)
+    local send = osc52.copy(reg)
+    return function(lines, regtype)
+      last = { lines, regtype }
+      send(lines)
+    end
+  end
+  local function paste()
+    return last
+  end
+  vim.g.clipboard = {
+    name = "OSC 52 (copy only)",
+    copy = { ["+"] = copy "+", ["*"] = copy "*" },
+    paste = { ["+"] = paste, ["*"] = paste },
+  }
+end
+
 -- Called first thing from init.lua, before the plugin's tunnel connects.
 -- No-op unless this is a remote-nvim server.
 function M.server_init()
   listen_local_only()
+  if M.is_remote then
+    copy_over_osc52()
+  end
   if M.is_remote and vim.env.RNVIM_DIR then
     keep_alive(vim.env.RNVIM_DIR)
   end
@@ -1214,13 +1244,37 @@ open_tab = function(port, workspace, folder, session)
   end
 end
 
+-- Makes the host's remote config an exact copy of this one, so files deleted
+-- or renamed here go there too (the plugin's own copy only adds and
+-- overwrites). The copy goes to a staging dir that's then swapped in, so a
+-- server already running from that config (another folder on the host) never
+-- sees it half there, and a failed copy leaves the old one in place.
+local function mirror_config(p)
+  local dir = p._remote_neovim_config_path
+  -- Never rm -rf anything but this workspace's config dir
+  assert(dir:find("/workspaces/" .. p._remote_workspace_id .. "/.config/", 1, true), "Unexpected config path " .. dir)
+  local new, old = dir .. ".new", dir .. ".old"
+  p:run_command(("rm -rf %s %s && mkdir -p %s"):format(new, old, new), "Preparing a clean copy of the config")
+  p:upload(
+    p._local_path_to_remote_neovim_config,
+    new,
+    "Copying your Neovim configuration onto remote",
+    require("remote-nvim").config.remote.copy_dirs.config.compression
+  )
+  p:run_command(
+    ("if [ -e %s ]; then mv %s %s; fi && mv %s %s && rm -rf %s"):format(dir, dir, old, new, dir, old),
+    "Replacing the old config"
+  )
+end
+
 -- Hooks that make folder sessions work (see open_client) and keep the remote
 -- config current.
 function M.track_sessions()
   local Provider = require "remote-nvim.providers.provider"
-  -- Copy the config on every fresh connect. The plugin remembers a per-host
-  -- "No (never)", which left hosts running a stale copy indefinitely.
-  -- RemoteRefresh restarts skip it, having just done a clean copy.
+  -- Mirror the config on every fresh connect, in place of the plugin's copy.
+  -- The plugin remembers a per-host "No (never)", which left hosts running a
+  -- stale copy indefinitely. RemoteRefresh restarts skip it, having just
+  -- mirrored it.
   function Provider:_get_neovim_config_upload_preference()
     if self._rnvim_skip_copy then
       self._rnvim_skip_copy = nil
@@ -1230,7 +1284,8 @@ function M.track_sessions()
       self._host_config.config_copy = true
       self._config_provider:update_workspace_config(self.unique_host_id, { config_copy = true })
     end
-    return true
+    mirror_config(self)
+    return false
   end
 
   -- Folder entries pick up the host's current workspace (it changes after a
@@ -1369,9 +1424,8 @@ function M.hosts()
   return ids
 end
 
--- :RemoteRefresh. Replaces the host's remote config with a clean copy of this
--- one (a normal connect only adds/overwrites files, so deleted files linger),
--- syncs plugins to lazy-lock.json, then offers to restart running sessions.
+-- :RemoteRefresh. Mirrors this config to the host without connecting, syncs
+-- plugins to lazy-lock.json, then offers to restart running sessions.
 -- Runs on its own provider so it never touches a running session's jobs.
 function M.refresh(host_id)
   local cfg = get(host_id)
@@ -1396,16 +1450,7 @@ function M.refresh(host_id)
     p:show_progress_view_window()
     p:_setup_workspace_variables()
 
-    local dir = p._remote_neovim_config_path
-    -- Never rm -rf anything but this workspace's config dir
-    assert(dir:find("/workspaces/" .. cfg.workspace_id .. "/.config/", 1, true), "Unexpected config path " .. dir)
-    p:run_command(("rm -rf %s && mkdir -p %s"):format(dir, dir), "Removing the old config from the remote")
-    p:upload(
-      p._local_path_to_remote_neovim_config,
-      dir,
-      "Copying your Neovim configuration onto remote",
-      remote_nvim.config.remote.copy_dirs.config.compression
-    )
+    mirror_config(p)
 
     -- Same environment the server runs in (see _launch_remote_neovim_server)
     local sync = table.concat({
