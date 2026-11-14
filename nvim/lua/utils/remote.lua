@@ -5,7 +5,7 @@
 --   it there. `is_remote` lets the statusline badge and configs/lazy.lua (which
 --   switches off local-only plugins) know they're running on that remote.
 -- * Client side: `open_client` opens the local `nvim --remote-ui` in a new tab
---   of the terminal running this nvim, like VS Code's new remote window.
+--   for SSH, and in the current window for DevPods (devcontainer/client.lua).
 
 local M = {}
 
@@ -168,12 +168,37 @@ function M.keep_progress_view()
   local ProgressView = require "remote-nvim.ui.progressview"
   local valid = vim.api.nvim_buf_is_valid
 
+  -- nui ids a node by parent + depth + text, so two identical output lines
+  -- (a JSON `},` from devpod, a repeated log line) share an id, which turns
+  -- the tree's sibling chain into a cycle: render then loops forever,
+  -- allocating until the machine runs out of memory. Every node gets its own
+  -- id instead, kept on the node so a re-add (output trimming) reuses it.
+  local seq = 0
+  local function unique_id(node)
+    if not node._rnvim_uid then
+      seq = seq + 1
+      node._rnvim_uid = seq
+    end
+    return "-" .. node._rnvim_uid
+  end
+
   local init = ProgressView.init
   function ProgressView:init(...)
     init(self, ...)
     local pv = self.progress_view
     pv.destroy = pv.unmount -- nui's real teardown, used when rebuilding below
     pv.unmount = pv.hide
+  end
+  -- (the two trees are made here; session info's again on every run)
+  for _, name in ipairs { "_setup_progress_view_pane", "_initialize_session_info_tree" } do
+    local make = ProgressView[name]
+    ProgressView[name] = function(self, ...)
+      local ret = make(self, ...)
+      for _, tree in pairs { self.progress_view_pane_tree, self.session_info_pane_tree } do
+        tree._.get_node_id = unique_id -- (pairs: the second is nil on the first call)
+      end
+      return ret
+    end
   end
 
   -- Tear the view down fully (windows, border, augroups, any buffer still
@@ -187,6 +212,27 @@ function M.keep_progress_view()
       end
     end
     self:init()
+  end
+
+  -- remote-nvim asks its questions (what to clean up, launch the client?,
+  -- which Neovim version) with vim.ui.select while its progress popup is up,
+  -- and the picker opened underneath it: the options were invisible but
+  -- focused, so Enter picked the first one blind. Hide the popup while it
+  -- asks; back once answered (a cancelled question ends the run there).
+  -- (scheduled: some questions are asked from a libuv callback, where window
+  -- calls aren't allowed; the hide still runs before the picker, which the
+  -- plugin schedules too)
+  local Provider = require "remote-nvim.providers.provider"
+  local get_selection = Provider.get_selection
+  function Provider:get_selection(...)
+    vim.schedule(function()
+      self:hide_progress_view_window()
+    end)
+    local choice = get_selection(self, ...)
+    vim.schedule(function()
+      self:show_progress_view_window()
+    end)
+    return choice
   end
 
   local start_run = ProgressView.start_run
@@ -319,6 +365,7 @@ local function rpc_notify(addr, code, args)
   end, 1000)
   return true
 end
+M.rpc_notify = rpc_notify
 
 -- Asks the server on the local end of the tunnel to quit the way the old
 -- hangup did (SIGTERM, so unsaved changes stay in swap files).
@@ -848,9 +895,11 @@ local function client_script()
   return path
 end
 
-local function in_container()
+-- Docker leaves /.dockerenv, Podman /run/.containerenv
+function M.in_container()
   return vim.uv.fs_stat "/.dockerenv" ~= nil or vim.uv.fs_stat "/run/.containerenv" ~= nil
 end
+local in_container = M.in_container
 
 -- "SSH: host" / "Dev Container: project", as VS Code's remote indicator reads.
 -- Worked out once: the statusline calls this on every redraw.
@@ -1104,16 +1153,22 @@ local function attach(session)
   open_tab(session:get_local_neovim_server_port(), cfg, session._rnvim_folder or cfg.folder, session)
 end
 
-local function start_folder(id)
+-- The session for saved workspace `id` (SSH host, folder or DevPod), set up
+-- as the plugin's own saved-workspace picker does
+function M.session_for(id)
   local cfg = get(id)
-  require("remote-nvim").session_provider
-    :get_or_initialize_session({
-      host = cfg.host,
-      provider_type = cfg.provider,
-      unique_host_id = id,
-      conn_opts = { cfg.connection_options },
-    })
-    :launch_neovim()
+  return require("remote-nvim").session_provider:get_or_initialize_session {
+    host = cfg.host,
+    provider_type = cfg.provider,
+    unique_host_id = id,
+    conn_opts = { cfg.connection_options },
+    devpod_opts = require("remote-nvim.providers.devpod.devpod_utils").get_workspace_devpod_opts(cfg),
+  }
+end
+
+-- Connect to saved workspace `id`
+function M.connect(id)
+  M.session_for(id):launch_neovim()
 end
 
 -- Set by the _launch_local_neovim_client patch (track_sessions) right before
@@ -1126,8 +1181,20 @@ function M.open_client(port, workspace)
   current = nil
   local server = "localhost:" .. port
   push_env(server)
-  if workspace.provider == "ssh" and session then
-    require("utils.port_forward").link(session, port) -- for :RemoteForward
+  if session then
+    -- for :RemoteForward there; DevPods are SSH hosts too (<id>.devpod)
+    require("utils.port_forward").link(session, port)
+  end
+  if workspace.provider == "devpod" and session then
+    local ok, client = pcall(require, "devcontainer.client")
+    local called, opened
+    if ok then
+      called, opened = pcall(client.open, port, workspace, session)
+    end
+    if called and opened then
+      return require("devcontainer.runtime").forward_ports(session, port)
+    end
+    vim.notify("Couldn't open the Dev Container in this window; using a remote UI tab.", vim.log.levels.WARN)
   end
   if workspace.provider ~= "ssh" or not session then
     return open_tab(port, workspace, nil, session)
@@ -1183,7 +1250,7 @@ function M.open_client(port, workspace)
       if running then
         return attach(running)
       end
-      return start_folder(id)
+      return M.connect(id)
     end
 
     remote_cd(server, dir, function()
@@ -1297,6 +1364,15 @@ function M.track_sessions()
       save_folder(cfg.parent, cfg.folder)
     end
     setup_vars(self, ...)
+    -- Treesitter parsers copied from here (data/site, configs/remote-nvim.lua)
+    -- only load on the same OS and CPU; other remotes build their own
+    local ts = require "utils.ts_parsers"
+    local copy = self._local_path_copy_dirs
+    if copy and copy.data and ts.platform() ~= ts.platform(self._host_config.os, self._host_config.arch) then
+      copy.data = vim.tbl_filter(function(path)
+        return vim.fs.basename(path) ~= "site"
+      end, copy.data)
+    end
     if cfg.folder then
       self._remote_working_dir = cfg.folder
     end
@@ -1316,29 +1392,6 @@ function M.track_sessions()
       self._config_provider:update_workspace_config(self.unique_host_id, { last_used = os.time() })
     end
     return launch(self, ...)
-  end
-
-  -- The :RemoteStart "Connect to saved workspace" list, most recently used
-  -- first. The plugin lists them in table order (random), so its finder gets
-  -- them sorted.
-  local saved = require "telescope._extensions.choices.remote-nvim.existing_workspace"
-  local list = saved.action
-  saved.action = function(...)
-    local finders = require "telescope.finders"
-    local new_table = finders.new_table
-    finders.new_table = function(t)
-      table.sort(t.results, function(a, b)
-        local x, y = a.config.last_used or 0, b.config.last_used or 0
-        if x ~= y then
-          return x > y
-        end
-        return (a.display or "") < (b.display or "")
-      end)
-      return new_table(t)
-    end
-    local ok, err = pcall(list, ...)
-    finders.new_table = new_table
-    assert(ok, err)
   end
 
   local launch_client = Provider._launch_local_neovim_client

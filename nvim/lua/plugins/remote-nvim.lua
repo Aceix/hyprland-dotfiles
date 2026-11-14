@@ -1,7 +1,9 @@
 -- Remote development over SSH and devcontainers, like VS Code's Remote - SSH
 -- and Dev Containers. This config is copied to the remote and runs there
--- (see configs/remote-nvim.lua); the local client opens in a new terminal tab
--- (utils/remote.lua). Devcontainers go through DevPod.
+-- (see configs/remote-nvim.lua); SSH clients open in a new terminal tab, while
+-- DevPods replace the current window (devcontainer/client.lua). Devcontainers
+-- go through DevPod. <leader>rs is the launcher (devcontainer/menu.lua);
+-- <leader>rD the same list narrowed to Dev Containers.
 return {
   "amitds1997/remote-nvim.nvim",
   version = "*",
@@ -10,9 +12,22 @@ return {
     "MunifTanjim/nui.nvim",
     "nvim-telescope/telescope.nvim",
   },
-  cmd = { "RemoteStart", "RemoteStop", "RemoteInfo", "RemoteCleanup", "RemoteConfigDel", "RemoteLog", "RemoteRefresh", "RemoteReconnect" },
+  cmd = {
+    "RemoteStart",
+    "RemoteStop",
+    "RemoteInfo",
+    "RemoteCleanup",
+    "RemoteConfigDel",
+    "RemoteLog",
+    "RemoteRefresh",
+    "RemoteReconnect",
+    "Devcontainer",
+  },
   keys = {
-    { "<leader>rs", "<cmd>RemoteStart<cr>", desc = "Remote: Connect (SSH / Devcontainer)" },
+    { "<leader>rs", "<cmd>RemoteStart<cr>", desc = "Remote: Open (SSH / Dev Containers)" },
+    { "<leader>rD", "<cmd>Devcontainer<cr>", desc = "Dev Containers: Actions" },
+    { "<leader>rR", "<cmd>Devcontainer rebuild<cr>", desc = "Dev Containers: Rebuild and reopen" },
+    { "<leader>rq", "<cmd>Devcontainer detach<cr>", desc = "Dev Containers: Detach (stops it)" },
     { "<leader>rr", "<cmd>RemoteRefresh<cr>", desc = "Remote: Re-copy config + sync plugins" },
     { "<leader>rS", "<cmd>RemoteStop<cr>", desc = "Remote: Stop session" },
     { "<leader>ri", "<cmd>RemoteInfo<cr>", desc = "Remote: Session info" },
@@ -20,6 +35,10 @@ return {
     { "<leader>rd", "<cmd>RemoteConfigDel<cr>", desc = "Remote: Forget saved host" },
     { "<leader>rl", "<cmd>RemoteLog<cr>", desc = "Remote: Open log" },
   },
+  -- "Reopen in Container" hint, before (and without) loading the plugin
+  init = function()
+    require("devcontainer").watch()
+  end,
   opts = require "configs.remote-nvim",
   config = function(_, opts)
     require("remote-nvim").setup(opts)
@@ -28,6 +47,7 @@ return {
     remote.secure_launch()
     remote.track_sessions()
     remote.ask_on_quit()
+    require("devcontainer").setup()
 
     vim.api.nvim_create_user_command("RemoteReconnect", remote.reconnect, {
       desc = "Retry a reconnect that's waiting for a password / passphrase / 2FA code",

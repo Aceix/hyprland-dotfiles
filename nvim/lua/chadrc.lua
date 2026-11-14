@@ -76,6 +76,8 @@ M.base46 = {
     St_Anomaly = { fg = "orange", bg = "statusline_bg" },
     St_FileModified = { fg = "yellow", bg = "lightbg" },
     St_Remote = { fg = "black", bg = "green", bold = true },
+    -- a devcontainer project you could reopen in a container (local side)
+    St_RemoteHint = { fg = "green", bg = "statusline_bg" },
     -- Source Control sidebar tabs and GitLens panel (utils/git_sidebar.lua,
     -- utils/git_panel.lua)
     GitSidebarTab = { fg = "light_grey", bg = "darker_black" },

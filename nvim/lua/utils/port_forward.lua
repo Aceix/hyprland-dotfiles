@@ -7,7 +7,8 @@
 -- connected from keeps a plain socket to each server it opened (through the
 -- session's own tunnel) and registers it there; the server sends requests
 -- back over it. They are read as data only: a port number, checked, then
--- `ssh -N -L` with the session's own ssh binary and options. Nothing the
+-- `ssh -N -L` with the session's own ssh binary and options (or, from a Dev
+-- Container, the bare words "rebuild" and "ui_gone"). Nothing the
 -- remote sends is ever run here, so a remote host still can't execute
 -- anything on this machine.
 local M = {}
@@ -146,6 +147,12 @@ local function on_request(link, action, port, here)
     end
     tell(link, "Stopped all forwarded ports", nil, here)
     refresh_all(link.session.host)
+  elseif action == "rebuild" and link.session.provider_type == "devpod" then
+    -- "Rebuild Container" typed inside a Dev Container
+    require("devcontainer.runtime").rebuild { id = link.session.unique_host_id, session = link.session }
+  elseif action == "ui_gone" and link.session.provider_type == "devpod" then
+    -- its last UI left without coming back here (terminal closed)
+    require("devcontainer.client").remote_ui_gone(link.session)
   end
 end
 
@@ -216,6 +223,15 @@ function M.link(session, port)
   end)
 end
 
+--- Forwards `port` from the server at localhost:`server_port` (linked above),
+--- e.g. a devcontainer's forwardPorts once it's open
+function M.forward(server_port, port)
+  local link = links[tonumber(server_port)]
+  if link and valid_port(port) then
+    open(link, port, true)
+  end
+end
+
 -- === Remote side: the server you type in ======================================
 
 local launcher -- channel id of the Neovim that opened this server
@@ -233,9 +249,12 @@ function M.set_state(ports, host)
   state.ports, state.host = ports, host
 end
 
-local function request(action, port)
+function M.request(action, port, quiet)
   if not launcher or not pcall(vim.rpcnotify, launcher, "port_forward", action, port) then
     launcher = nil
+    if quiet then
+      return false
+    end
     vim.notify(
       "Not linked to the Neovim this session was opened from. Reconnect the session (or reopen it from there) and try again.",
       vim.log.levels.WARN
@@ -273,7 +292,7 @@ end
 
 local function dispatch(action, port)
   if require("utils.remote").is_remote then
-    request(action, port)
+    M.request(action, port)
   else
     local_request(action, port)
   end

@@ -220,11 +220,17 @@ M.cwd = function()
   return "%#St_cwd_sep#" .. sep_l .. "%#St_cwd_icon#󰉋 %#St_cwd_text# " .. name .. " "
 end
 
--- VS Code's remote indicator: only shows when this nvim is a remote-nvim
--- server. utils.remote has no requires of its own, so it's safe here.
+-- VS Code's remote indicator: where this nvim runs when it's a remote-nvim
+-- server; locally, a hint when the folder can be reopened in a container
+-- (<leader>rD). Both are cached, so cheap on every redraw; utils.remote and
+-- devcontainer.project have no requires of their own at load.
 M.remote = function()
-  local label = require("utils.remote").label()
-  return label == "" and "" or "%#St_Remote# 󰒍 " .. label .. " "
+  local remote = require "utils.remote"
+  local label = remote.label()
+  if label ~= "" then
+    return "%#St_Remote# 󰒍 " .. label .. " "
+  end
+  return not remote.is_remote and require("devcontainer.project").root() and "%#St_RemoteHint# 󰡨 Dev Container " or ""
 end
 
 M.recording = function()
