@@ -33,4 +33,9 @@ for _, ft in ipairs {
   options.formatters_by_ft[ft] = prettier
 end
 
+-- ... and the languages set up on first use (lua/langs)
+for ft, formatters in pairs(require("langs").formatters()) do
+  options.formatters_by_ft[ft] = formatters
+end
+
 return options

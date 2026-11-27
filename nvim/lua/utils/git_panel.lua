@@ -602,7 +602,11 @@ function M.open(root)
   end
   if not M.is_visible() then
     -- edgy picks it up by filetype and docks it under Neogit's status
-    local win = vim.api.nvim_open_win(state.buf, false, { split = "left", win = -1 })
+    local win = vim.api.nvim_open_win(
+      state.buf,
+      false,
+      { split = "left", win = -1, width = require("utils.git_sidebar").width() }
+    )
     vim.wo[win].number = false
     vim.wo[win].relativenumber = false
     vim.wo[win].cursorline = true

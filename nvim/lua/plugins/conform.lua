@@ -1,5 +1,9 @@
 return {
   "stevearc/conform.nvim",
-  -- event = 'BufWritePre', -- uncomment for format on save
-  opts = require "configs.conform",
+  -- Manual (<leader>cf) unless <leader>uF turns format-on-save on
+  -- (configs/toggles.lua). A function, so the formatter table is only built
+  -- when conform is first used.
+  opts = function()
+    return require "configs.conform"
+  end,
 }

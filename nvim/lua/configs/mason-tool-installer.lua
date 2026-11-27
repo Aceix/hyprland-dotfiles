@@ -46,6 +46,15 @@ return {
     -- Python / Dart debuggers
     "debugpy",
     "dart-debug-adapter",
+    -- Every filetype
+    "typos-lsp",
+    -- Copilot: ghost text and next-edit suggestions (plugins/sidekick.lua)
+    {
+      "copilot-language-server",
+      condition = function()
+        return not require("utils.remote").is_remote
+      end,
+    },
   },
   -- don't compete with first paint
   start_delay = 3000,

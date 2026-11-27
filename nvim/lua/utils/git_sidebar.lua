@@ -73,6 +73,14 @@ local function open_scm()
     return false
   end
   require("neogit").open { cwd = root, kind = "vsplit_left" }
+  -- Neogit splits half the screen; take the side bar's width before the next
+  -- redraw instead of flashing wide until edgy's layout pass
+  local win = find_wins(function(ft)
+    return ft == "NeogitStatus"
+  end)[1]
+  if win then
+    vim.api.nvim_win_set_width(win, M.width())
+  end
   return true
 end
 
@@ -604,12 +612,27 @@ function M.setup()
   -- width first. This is registered before edgy's handler (edgy loads on
   -- VeryLazy), so edgy's layout pass already sees it. Only windows edgy has
   -- settled count -- a freshly opened one (not yet at the shared width)
-  -- or a terminal resize would otherwise overwrite the saved width.
+  -- or a terminal resize would otherwise overwrite the saved width. While a
+  -- view is still arriving (e.g. the outline opening at its own width under
+  -- the Explorer), the whole pane's resizes are layout, not a drag.
   local settled = {} ---@type table<integer, boolean>
   local columns = vim.o.columns
+  -- Every view sharing the pane: the two above, and the outline when docked
+  -- under the Explorer (utils/outline_dock.lua)
+  local function in_pane(win)
+    local ft = ft_of(win)
+    return is_sidebar_ft(ft) or (ft == "Outline" and require("utils.outline_dock").dock() == "left")
+  end
+  local function arriving()
+    for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+      if not settled[win] and vim.api.nvim_win_get_config(win).relative == "" and in_pane(win) then
+        return true
+      end
+    end
+  end
   local function settle()
     for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
-      if M.is_sidebar_win(win) and vim.api.nvim_win_get_width(win) == M.width() then
+      if in_pane(win) and vim.api.nvim_win_get_width(win) == M.width() then
         settled[win] = true
       end
     end
@@ -620,9 +643,9 @@ function M.setup()
     callback = function()
       if vim.o.columns ~= columns then
         columns = vim.o.columns
-      else
+      elseif not arriving() then
         for _, win in ipairs(vim.v.event.windows or {}) do
-          if settled[win] and vim.api.nvim_win_is_valid(win) and M.is_sidebar_win(win) then
+          if settled[win] and vim.api.nvim_win_is_valid(win) and in_pane(win) then
             local w = vim.api.nvim_win_get_width(win)
             -- Wider than that is the editor beside it closing and the side
             -- bar taking the screen, not a drag

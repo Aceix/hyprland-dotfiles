@@ -1,6 +1,9 @@
 return {
   "sudo-tee/opencode.nvim",
-  lazy = false,
+  -- Needs the `opencode` CLI; without it setup() errors at startup
+  cond = vim.fn.executable "opencode" == 1,
+  cmd = "Opencode",
+  keys = { { "<leader>ao", mode = { "n", "v" }, desc = "OpenCode" } },
   opts = { keymap_prefix = "<leader>ao" },
   dependencies = {
     "MeanderingProgrammer/render-markdown.nvim",

@@ -84,6 +84,10 @@ local function is_session_worthy(buf)
   if vim.fn.isdirectory(name) == 1 then
     return false
   end
+  -- Query buffers (dadbod) and other tools' scratch files
+  if require("utils.sensitive").is_temp(name) then
+    return false
+  end
   return true
 end
 
@@ -117,16 +121,14 @@ vim.api.nvim_create_autocmd("User", {
 })
 
 -- mini.map's setup() only registers the module, it never opens the map window,
--- so open it automatically for real file buffers. <leader>uM (see
--- lua/mappings.lua) flips vim.g.minimap_auto_open, so an explicit close stays
--- closed for the rest of the session instead of popping back on the next
--- BufEnter.
+-- so while the <leader>uM switch is on (vim.g.minimap_auto_open, off by
+-- default, see configs/toggles.lua) open it for every real file buffer.
 local minimap_group = vim.api.nvim_create_augroup("MiniMapAutoOpen", { clear = true })
 
 vim.api.nvim_create_autocmd({ "BufEnter", "BufWinEnter" }, {
   group = minimap_group,
   callback = function(args)
-    if vim.g.minimap_auto_open == false then
+    if not vim.g.minimap_auto_open or vim.b[args.buf].bigfile then
       return
     end
     -- Real file buffers only: skip terminals, the file tree, quickfix, help,
@@ -328,42 +330,16 @@ if transparency.supported() then
 end
 
 
--- Big-file guard: skip treesitter and LSP for files over 1.5 MB (minified
--- bundles, generated JSON, logs) so opening them stays instant.
-local bigfile_group = vim.api.nvim_create_augroup("BigFile", { clear = true })
+-- Big-file guard (utils/bigfile.lua), secrets kept out of swap / undo /
+-- backup files (utils/sensitive.lua), local history snapshots on save
+-- (utils/local_history.lua) and per-project `.nvim.lua` (utils/exrc.lua)
+require("utils.bigfile").setup()
+require("utils.sensitive").setup()
+require("utils.local_history").setup()
+require("utils.exrc").setup()
 
-vim.api.nvim_create_autocmd("BufReadPre", {
-  group = bigfile_group,
-  callback = function(args)
-    local stat = vim.uv.fs_stat(args.match)
-    if stat and stat.size > 1.5 * 1024 * 1024 then
-      vim.b[args.buf].bigfile = true
-    end
-  end,
-})
-
-vim.api.nvim_create_autocmd("FileType", {
-  group = bigfile_group,
-  callback = function(args)
-    if vim.b[args.buf].bigfile then
-      -- NvChad starts treesitter from its own FileType autocmd; stop it after
-      vim.schedule(function()
-        pcall(vim.treesitter.stop, args.buf)
-      end)
-    end
-  end,
-})
-
-vim.api.nvim_create_autocmd("LspAttach", {
-  group = bigfile_group,
-  callback = function(args)
-    if vim.b[args.buf].bigfile then
-      vim.schedule(function()
-        vim.lsp.buf_detach_client(args.buf, args.data.client_id)
-      end)
-    end
-  end,
-})
+-- PHP, Rust, shell, Docker, SQL: set up when first opened (lua/langs)
+require("langs").setup()
 
 -- VS Code-style breadcrumbs (path › symbol › symbol) in the winbar
 require("utils.breadcrumbs").setup()
@@ -397,8 +373,9 @@ require("utils.diff").setup()
 -- (utils/autoreload.lua)
 require("utils.autoreload").setup()
 
--- VS Code fold chevrons in the gutter, clickable (utils/fold_gutter.lua)
-require("utils.fold_gutter").setup()
+-- VS Code's gutter lanes: signs, numbers, git bar, clickable fold chevrons
+-- (utils/statuscolumn.lua)
+require("utils.statuscolumn").setup()
 
 -- Plugin panes (the outline, the git panel, quickfix, Trouble, ...):
 -- double-click does what <CR> does there, as in VS Code. Panes that map the

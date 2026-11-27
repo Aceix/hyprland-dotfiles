@@ -18,8 +18,13 @@ function M.dock()
   return vim.g.OUTLINE_DOCK == "right" and "right" or "left"
 end
 
+-- Docked left it opens straight at the side bar's width, not at its own
+-- (25% of the screen) until edgy's layout pass snaps it back
 local function split_command()
-  return M.dock() == "left" and "topleft vs" or "botright vs"
+  if M.dock() == "left" then
+    return ("topleft %dvs"):format(require("utils.git_sidebar").width())
+  end
+  return "botright vs"
 end
 
 local function find_win(ft)

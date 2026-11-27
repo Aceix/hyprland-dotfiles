@@ -44,6 +44,25 @@ vim.opt.keymodel = "startsel"
 vim.opt.sessionoptions = "curdir,folds,help,tabpages,winsize"
 
 
+-- Project-local config: a `.nvim.lua` in the project root runs once it has
+-- been trusted (the prompt on first sight, or :trust). utils/exrc.lua covers
+-- projects switched to mid-session.
+vim.o.exrc = true
+
+-- The copy made while a file is being written goes to the state dir, not next
+-- to the file (the default tries "." first, which trips file watchers)
+vim.opt.backupdir = vim.fn.stdpath "state" .. "/backup//"
+
+-- Compose files get their own filetype, which is what their language server
+-- (lua/langs/docker.lua) and yamlls's Compose schema key on
+vim.filetype.add {
+  pattern = {
+    ["compose%.ya?ml"] = "yaml.docker-compose",
+    ["docker%-compose[%w%-.]*%.ya?ml"] = "yaml.docker-compose",
+    ["compose%.[%w%-]+%.ya?ml"] = "yaml.docker-compose",
+  },
+}
+
 -- Long messages pause briefly instead of a "Press ENTER" prompt, which blocks
 -- everything scheduled (e.g. port forwards asked for by a remote session)
 vim.opt.messagesopt = "wait:5000,history:500"

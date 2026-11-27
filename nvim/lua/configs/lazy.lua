@@ -11,6 +11,9 @@ local local_only = {
   ["flutter-tools.nvim"] = true,
   ["posting.nvim"] = true,
   ["atlas.nvim"] = true,
+  ["sidekick.nvim"] = true,
+  ["claudecode.nvim"] = true,
+  ["molten-nvim"] = true,
 }
 local is_remote = require("utils.remote").is_remote
 

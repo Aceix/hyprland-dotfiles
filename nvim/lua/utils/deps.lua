@@ -72,8 +72,13 @@ M.debug = {
 }
 M.debug.go = M.debug.delve
 
+-- The languages set up on first use declare theirs (lua/langs)
+local langs = require("langs").deps { exe = exe, file = file, mason = mason }
+M.test = vim.tbl_extend("error", M.test, langs.test)
+M.debug = vim.tbl_extend("error", M.debug, langs.debug)
+
 -- Debugger a neotest `strategy = "dap"` run uses, by filetype
-local debug_type = { go = "delve", python = "python", java = "java", dart = "dart" }
+local debug_type = { go = "delve", python = "python", java = "java", dart = "dart", php = "php" }
 for _, ft in ipairs(M.js_fts) do
   debug_type[ft] = "pwa-node"
 end

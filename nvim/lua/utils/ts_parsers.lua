@@ -136,7 +136,8 @@ end
 
 -- Builds the parsers in `wanted` that are missing (filetype aliases resolve to
 -- the parser behind them: `jsonc` is `json`). A no-op once all are there.
-function M.ensure(wanted)
+-- `on_built` runs after a build, not when nothing was missing.
+function M.ensure(wanted, on_built)
   local ts = require "nvim-treesitter"
   local remote = require("utils.remote").is_remote
   if remote then
@@ -176,7 +177,10 @@ function M.ensure(wanted)
     -- force: nvim-treesitter counts a language whose queries are there as
     -- installed, so a missing (or dropped) parser with copied queries would
     -- be skipped; `need` only holds parsers that really aren't there
-    ts.install(need, { force = true, summary = true })
+    local task = ts.install(need, { force = true, summary = true })
+    if on_built then
+      task:await(vim.schedule_wrap(on_built))
+    end
   end)
 end
 

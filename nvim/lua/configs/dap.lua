@@ -133,6 +133,9 @@ return function()
   dap.listeners.before.attach.dapui_config = dap_ui.open
   dap.listeners.before.launch.dapui_config = dap_ui.open
 
+  -- Adapters of the languages set up on first use (lua/langs)
+  require("langs").apply_dap(dap)
+
   -- Warn and stop when a session's debugger is missing (utils/deps.lua)
   require("utils.deps").guard_dap()
 end

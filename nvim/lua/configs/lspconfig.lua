@@ -1,5 +1,13 @@
 require("nvchad.configs.lspconfig").defaults()
 
+-- Messages are drawn by tiny-inline-diagnostic instead of NvChad's virtual
+-- text, unless <leader>ud switched that off (configs/toggles.lua)
+vim.diagnostic.config {
+  virtual_text = vim.g.inline_diagnostics == false and { prefix = "" } or false,
+  severity_sort = true,
+  signs = false, -- inline only; the gutter is for breakpoints, tests, git
+}
+
 -- Servers start per buffer only: `vim.lsp.enable` registers a FileType hook,
 -- and each config's root_markers keep e.g. angularls/svelte/tailwindcss out of
 -- projects that don't use them. Configs come from nvim-lspconfig's lsp/*.lua;
@@ -142,6 +150,11 @@ vim.lsp.config("eslint", {
   settings = { workingDirectories = { mode = "auto" } },
 })
 
+-- Spell-checks identifiers, comments and strings in any file; hints, not
+-- warnings, so it never competes with real problems. Off until <leader>uS
+-- (configs/toggles.lua) enables it.
+vim.lsp.config("typos_lsp", { init_options = { diagnosticSeverity = "Hint" } })
+
 vim.lsp.enable {
   -- Go
   "gopls",
@@ -169,6 +182,15 @@ vim.lsp.enable {
   "wasm_language_tools",
 }
 -- Java is started per project by nvim-jdtls (plugins/jdtls.lua), not here.
+-- PHP, Rust, shell, Compose and SQL servers are enabled by lua/langs when a
+-- file of theirs is first opened.
+
+-- Copilot: as-you-type ghost text (below) and next-edit suggestions
+-- (plugins/sidekick.lua). Sign in once with :LspCopilotSignIn. Local only: a
+-- remote host would need its own sign-in.
+if not require("utils.remote").is_remote then
+  vim.lsp.enable "copilot"
+end
 
 vim.api.nvim_create_autocmd("LspAttach", {
   group = vim.api.nvim_create_augroup("UserLspAttach", { clear = true }),
@@ -183,6 +205,10 @@ vim.api.nvim_create_autocmd("LspAttach", {
     end
     if client:supports_method "textDocument/inlayHint" then
       vim.lsp.inlay_hint.enable(true, { bufnr = args.buf })
+    end
+    -- Ghost text; <Tab> accepts (plugins/blink.lua), <leader>ug toggles
+    if client:supports_method "textDocument/inlineCompletion" and vim.g.ghost_text ~= false then
+      vim.lsp.inline_completion.enable(true, { bufnr = args.buf })
     end
   end,
 })

@@ -1,4 +1,4 @@
--- VS Code's folding gutter, drawn through 'statuscolumn' left of the signs:
+-- VS Code's folding gutter, the last lane of utils/statuscolumn.lua:
 --   * a chevron on every line that starts a fold; clicking it folds/unfolds
 --   * open-fold chevrons only show while the mouse is over that window's
 --     gutter, collapsed ones always do
@@ -10,7 +10,7 @@ local OPEN, CLOSED = vim.fn.nr2char(0xeab4), vim.fn.nr2char(0xeab6) -- codicon c
 ---@type integer? window whose gutter the mouse is over
 local hovered
 
---- Columns the fold chevrons take in `win` (utils/test_gutter.lua skips them).
+--- Columns the fold chevrons take in `win`.
 function M.width(win)
   local buf = vim.api.nvim_win_get_buf(win)
   return (vim.bo[buf].buftype == "" or vim.wo[win].diff) and 2 or 0
@@ -63,17 +63,6 @@ function M.click(_, _, button)
   if m.winid == 0 or m.line == 0 then
     return
   end
-  -- The click area runs on over the sign column (terminals draw the chevron
-  -- over two cells and may report its right edge as the next one), but only
-  -- where that line shows no sign: a test button, breakpoint, git or
-  -- diagnostic sign keeps its own click (e.g. utils/test_gutter.lua)
-  if m.wincol > M.width(m.winid) then
-    local buf = vim.api.nvim_win_get_buf(m.winid)
-    local row = m.line - 1
-    if #vim.api.nvim_buf_get_extmarks(buf, -1, { row, 0 }, { row, -1 }, { type = "sign" }) > 0 then
-      return
-    end
-  end
   vim.api.nvim_win_call(m.winid, function()
     if vim.fn.foldclosed(m.line) ~= -1 then
       vim.cmd(m.line .. "foldopen")
@@ -121,7 +110,6 @@ function M.foldtext()
 end
 
 function M.setup()
-  vim.o.statuscolumn = "%@v:lua.require'utils.fold_gutter'.click@%{%v:lua.require'utils.fold_gutter'.render()%}%s%T%l "
   vim.o.foldtext = "v:lua.require'utils.fold_gutter'.foldtext()"
   vim.opt.fillchars:append { fold = " " }
   vim.o.mousemoveevent = true

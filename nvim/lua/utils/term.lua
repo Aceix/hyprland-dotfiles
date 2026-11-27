@@ -316,7 +316,7 @@ local function configure_win(win)
   wo.winfixwidth = false
   wo.winhighlight = ""
   wo.winbar = WINBAR
-  wo.statuscolumn = "" -- (utils/fold_gutter.lua's would take a column)
+  wo.statuscolumn = "" -- (utils/statuscolumn.lua's would take columns)
   wo.fillchars = "eob: "
   -- The row separating the pane from the code above is drawn by the window
   -- *above*, so a window-local 'fillchars'/'winhighlight' here cannot thicken
@@ -706,7 +706,10 @@ api.nvim_create_autocmd({ "DiagnosticChanged", "QuickFixCmdPost" }, {
 api.nvim_create_autocmd("TermClose", {
   group = group,
   callback = function(args)
-    if index_of(args.buf) then
+    -- (b:nvterm_keep: a finished task's output stays up, plugins/overseer.lua)
+    -- (the buffer may already be gone, see above: then it can't be kept)
+    local keep = api.nvim_buf_is_valid(args.buf) and vim.b[args.buf].nvterm_keep
+    if index_of(args.buf) and not keep then
       vim.schedule(function()
         remove(args.buf)
       end)

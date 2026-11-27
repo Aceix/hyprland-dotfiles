@@ -13,7 +13,13 @@ local call = require "utils.call"
 -- that's <C-Tab> / <C-S-Tab> below. In Normal mode they're a no-op, overriding
 -- NvChad's next/prev buffer. <Nop> rather than unmapping: most terminals send
 -- Tab as <C-i>, which would otherwise jump forward in the jumplist.
-map("n", "<Tab>", "<Nop>", { desc = "Nothing (VS Code)" })
+-- ... except onto Copilot's next-edit suggestion when one is showing: jump to
+-- it, then apply it (plugins/sidekick.lua)
+map("n", "<Tab>", function()
+  if package.loaded.sidekick then
+    require("sidekick").nes_jump_or_apply()
+  end
+end, { desc = "Next Edit Suggestion: Jump / Apply" })
 map("n", "<S-Tab>", "<Nop>", { desc = "Nothing (VS Code)" })
 map("v", "<Tab>", ">gv", { desc = "Indent selection right" })
 map("v", "<S-Tab>", "<gv", { desc = "Indent selection left" })
@@ -82,6 +88,40 @@ map({ "n", "v" }, "<leader>ac", "<cmd>CodeCompanionActions<cr>", { desc = "AI Ac
 map({ "n", "v" }, "<leader>ai", "<cmd>CodeCompanion<cr>", { desc = "AI Inline Prompt" })
 map("n", "<leader>ah", "<cmd>CodeCompanionHistory<cr>", { desc = "AI Browse Saved Chat History" })
 map("n", "<leader>aS", "<cmd>CodeCompanionSummaries<cr>", { desc = "AI Browse Chat Summaries" })
+
+-- A chat driven by an external coding agent over ACP, which brings its own
+-- tools, permissions and login (Claude: CLAUDE_CODE_OAUTH_TOKEN, from
+-- `claude setup-token`). Only the agents installed here are offered.
+map("n", "<leader>aA", function()
+  local agents = vim.tbl_filter(function(agent)
+    return vim.fn.executable(agent.bin) == 1
+  end, {
+    { name = "Claude Code", adapter = "claude_code", bin = "claude-agent-acp" },
+    { name = "Codex", adapter = "codex", bin = "codex-acp" },
+    { name = "Gemini CLI", adapter = "gemini_cli", bin = "gemini" },
+  })
+  if #agents == 0 then
+    return vim.notify("No ACP agent installed: claude-agent-acp, codex-acp or gemini", vim.log.levels.WARN)
+  end
+  vim.ui.select(agents, {
+    prompt = "Agent",
+    format_item = function(agent)
+      return agent.name
+    end,
+  }, function(agent)
+    if agent then
+      vim.cmd("CodeCompanionChat adapter=" .. agent.adapter)
+    end
+  end)
+end, { desc = "AI Agent Chat (ACP)" })
+
+-- Copilot ghost text: other suggestions for the same spot (<Tab> accepts)
+map("i", "<A-]>", function()
+  vim.lsp.inline_completion.select { count = 1 }
+end, { desc = "Next Inline Suggestion" })
+map("i", "<A-[>", function()
+  vim.lsp.inline_completion.select { count = -1 }
+end, { desc = "Previous Inline Suggestion" })
 
 -- <C-Tab> / <C-S-Tab>: cycle forward / backward, mode-aware by buffer type.
 --   * terminal / Problems -> cycle the bottom panel's tabs (utils.term)
@@ -218,8 +258,18 @@ map("n", "<leader>tz", term "toggle_height", { desc = "Maximize Bottom Panel" })
 
 -- Code / LSP Actions (<leader>c)
 -- Refactoring & Actions
-map({ "n", "v" }, "<leader>ca", vim.lsp.buf.code_action, { desc = "Code Action" })
-map("n", "<leader>cr", vim.lsp.buf.rename, { desc = "Rename Symbol" })
+-- (also F2 and <C-.> in vscode_keys.lua)
+local function code_action()
+  require("tiny-code-action").code_action()
+end
+-- Live preview of the rename in every occurrence (inc-rename.nvim)
+local function rename()
+  require "inc_rename" -- loaded now: the preview needs the real command
+  return ":IncRename " .. vim.fn.expand "<cword>"
+end
+map({ "n", "v" }, "<leader>ca", code_action, { desc = "Code Action" })
+map("n", "<leader>cr", rename, { expr = true, desc = "Rename Symbol" })
+map("n", "<leader>cl", vim.lsp.codelens.run, { desc = "Run Code Lens" })
 map({ "n", "v" }, "<leader>cf", function()
   require("conform").format { lsp_fallback = true }
 end, { desc = "Format Code" })
@@ -234,6 +284,14 @@ map("n", "<leader>cD", vim.lsp.buf.declaration, { desc = "Go to Declaration" })
 map("n", "<leader>ci", "<cmd>Telescope lsp_implementations<cr>", { desc = "Go to Implementation" })
 map("n", "<leader>ct", "<cmd>Telescope lsp_type_definitions<cr>", { desc = "Type Definition" })
 map("n", "<leader>cR", "<cmd>Telescope lsp_references<cr>", { desc = "View References" })
+
+-- Type Hierarchy (into the bottom panel's list)
+map("n", "<leader>cy", function()
+  vim.lsp.buf.typehierarchy "subtypes"
+end, { desc = "Type Hierarchy (Subtypes)" })
+map("n", "<leader>cY", function()
+  vim.lsp.buf.typehierarchy "supertypes"
+end, { desc = "Type Hierarchy (Supertypes)" })
 
 -- Call Hierarchy
 map("n", "<leader>cc", "<cmd>Telescope lsp_incoming_calls<cr>", { desc = "Call Hierarchy (Incoming)" })
@@ -252,9 +310,6 @@ map("n", "K", call("utils.float_focus", "hover"), { desc = "Hover Documentation"
 map("n", "<leader>ck", vim.lsp.buf.signature_help, { desc = "Signature Help" })
 map("n", "<leader>ce", diagnostic_float, { desc = "Line Diagnostics Float" })
 map("n", "<leader>cq", vim.diagnostic.setqflist, { desc = "Diagnostics Quickfix List" })
-map("n", "<leader>uh", function()
-  vim.lsp.inlay_hint.enable(not vim.lsp.inlay_hint.is_enabled { bufnr = 0 }, { bufnr = 0 })
-end, { desc = "Toggle Inlay Hints" })
 
 -- Register WhichKey group labels
 local wk_ok, wk = pcall(require, "which-key")
@@ -263,7 +318,7 @@ if wk_ok then
     { "<leader>c", group = "Code / LSP" },
     { "<leader>cd", group = "Diagnostics / Trouble" },
     { "<leader>cT", group = "Test (Neotest)" },
-    { "<leader>cj", group = "Java (jdtls)" },
+    { "<leader>cj", group = "Language (Java / Rust)" },
     { "<leader>f", group = "Find / Telescope" },
     { "<leader>s", group = "Search & Replace" },
     { "<leader>d", group = "Debugger" },
@@ -274,6 +329,11 @@ if wk_ok then
     { "<leader>g", group = "Git" },
     { "<leader>a", group = "AI Assistant" },
     { "<leader>r", group = "Remote (SSH / Devcontainer)" },
+    { "<leader>cx", group = "Refactor" },
+    { "<leader>o", group = "Tasks" },
+    { "<leader>al", group = "Claude Code" },
+    { "<leader>N", group = "Notebook (Jupyter)" },
+    { "gs", group = "Surround" },
   }
 end
 
@@ -296,8 +356,12 @@ map("n", "<leader>cdb", "<cmd>Trouble diagnostics toggle filter.buf=0<cr>", { de
 map("n", "<leader>cdl", "<cmd>Trouble loclist toggle<cr>", { desc = "Location List (Trouble)" })
 map("n", "<leader>cdq", "<cmd>Trouble qflist toggle<cr>", { desc = "Quickfix List (Trouble)" })
 map("n", "gl", diagnostic_float, { desc = "Open floating diagnostic message" })
-map("n", "[d", vim.diagnostic.goto_prev, { desc = "Previous Diagnostic" })
-map("n", "]d", vim.diagnostic.goto_next, { desc = "Next Diagnostic" })
+map("n", "[d", function()
+  vim.diagnostic.jump { count = -vim.v.count1, float = true }
+end, { desc = "Previous Diagnostic" })
+map("n", "]d", function()
+  vim.diagnostic.jump { count = vim.v.count1, float = true }
+end, { desc = "Next Diagnostic" })
 
 -- ]] / [[ jump to the next / previous use of the symbol under the cursor
 -- (snacks.words, plugins/snacks.lua), in buffers whose language server finds
@@ -362,13 +426,23 @@ map("n", "<leader>uf", call("utils.autoresize", "toggle"), { desc = "Toggle Wind
 map("n", "<leader>um", call("utils.maximize", "toggle"), { desc = "Maximize Split Window" })
 map("n", "<leader>ui", call("utils.svg_preview", "toggle"), { desc = "Toggle SVG Code/Preview" })
 map("n", "<leader>un", call("utils.messages", "show"), { desc = "Show All Messages" })
--- Also flips the auto-open flag read by the MiniMapAutoOpen autocmd (see
--- lua/autocmds.lua), so closing the map keeps it closed until toggled back on.
-map("n", "<leader>uM", function()
-  local minimap = require "mini.map"
-  minimap.toggle()
-  vim.g.minimap_auto_open = minimap.current.win_data[vim.api.nvim_get_current_tabpage()] ~= nil
-end, { desc = "Toggle Minimap" })
+-- On/off switches (utils/toggle.lua): <leader>u + key
+require("utils.toggle").setup(require "configs.toggles")
+
+-- Undo history as a tree (built into Neovim 0.12); per-save snapshots are
+-- <leader>fH (plugins/file-history.lua)
+map("n", "<leader>uu", function()
+  vim.cmd.packadd "nvim.undotree"
+  vim.cmd.Undotree()
+end, { desc = "Undo Tree" })
+
+-- Scratch buffers, one per project and filetype, kept between sessions
+map("n", "<leader>.", function()
+  Snacks.scratch()
+end, { desc = "Scratch Buffer" })
+map("n", "<leader>S", function()
+  Snacks.scratch.select()
+end, { desc = "Scratch Buffers" })
 
 -- VS Code-style shortcuts on top of everything above (toggle in lua/settings.lua)
 if require("settings").vscode_keys then

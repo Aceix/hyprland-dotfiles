@@ -1,7 +1,21 @@
 -- GitLens' editor features: blame at the end of the current line, blame
 -- hover and full-file blame (mapped in lua/mappings.lua), and gutter change
 -- markers with VS Code's next/previous change keys.
+
+-- One-cell bars for the gutter's git lane (utils/statuscolumn.lua); deleted
+-- lines show as a line under/over their neighbour, as in VS Code
+local bars = {
+  add = { text = "▎" },
+  change = { text = "▎" },
+  delete = { text = "▁" },
+  topdelete = { text = "▔" },
+  changedelete = { text = "▎" },
+  untracked = { text = "┆" },
+}
+
 return {
+  signs = bars,
+  signs_staged = bars,
   current_line_blame = true,
   current_line_blame_opts = {
     virt_text = true,

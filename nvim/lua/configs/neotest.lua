@@ -31,7 +31,11 @@ return function()
         end
       end
       vim.schedule(function()
-        vim.notify("Loading test env from: " .. vim.fn.fnamemodify(file, ":~:."), vim.log.levels.INFO, { title = "neotest" })
+        vim.notify(
+          "Loading test env from: " .. vim.fn.fnamemodify(file, ":~:."),
+          vim.log.levels.INFO,
+          { title = "neotest" }
+        )
       end)
 
       -- neotest-java starts its debug JVM inside build_spec, from nvim's own
@@ -59,47 +63,51 @@ return function()
     return adapter
   end
 
+  local adapters = {
+    -- Go: reads `go test -json`, works with delve for `<leader>Td`
+    require "neotest-golang",
+
+    -- Dart/Flutter: `use_lsp` leans on the dartls outline so generated or
+    -- interpolated test names still resolve. Swap `command` to "dart" for
+    -- pure Dart packages, or "fvm flutter" when using fvm.
+    require "neotest-dart" {
+      command = "flutter",
+      use_lsp = true,
+    },
+
+    -- JS/TS: jest and vitest each claim only the projects whose config they
+    -- find, so both can sit here at once.
+    require "neotest-jest" {
+      jestCommand = "npm test --",
+      env = { CI = true },
+    },
+    require "neotest-vitest",
+
+    -- Java: needs jdtls attached; run `:NeotestJava setup` once to fetch the
+    -- JUnit Platform Console Standalone jar. Its compile step is swapped for
+    -- one that waits for (and reports on) the jdtls build, utils/java_build.lua.
+    require "neotest-java"({}, { lsp_compiler = require("utils.java_build").compiler() }),
+
+    -- Python: pytest (or unittest when pytest isn't installed) from the
+    -- project's own venv, found the same way as the LSP and debugger.
+    require "neotest-python" {
+      python = function(root)
+        return require("utils.python").path(root)
+      end,
+      dap = { justMyCode = false },
+      -- pytest hides print() output from passing tests; -s lets it stream
+      -- live into Test Results (unittest never captures, and reads -s as
+      -- its start directory, so only for pytest)
+      args = function(runner)
+        return runner == "pytest" and { "-s" } or {}
+      end,
+    },
+  }
+  -- PHP, Rust: only in their projects (lua/langs)
+  vim.list_extend(adapters, require("langs").neotest_adapters())
+
   require("neotest").setup {
-    adapters = vim.tbl_map(with_env_test, {
-      -- Go: reads `go test -json`, works with delve for `<leader>Td`
-      require "neotest-golang",
-
-      -- Dart/Flutter: `use_lsp` leans on the dartls outline so generated or
-      -- interpolated test names still resolve. Swap `command` to "dart" for
-      -- pure Dart packages, or "fvm flutter" when using fvm.
-      require "neotest-dart" {
-        command = "flutter",
-        use_lsp = true,
-      },
-
-      -- JS/TS: jest and vitest each claim only the projects whose config they
-      -- find, so both can sit here at once.
-      require "neotest-jest" {
-        jestCommand = "npm test --",
-        env = { CI = true },
-      },
-      require "neotest-vitest",
-
-      -- Java: needs jdtls attached; run `:NeotestJava setup` once to fetch the
-      -- JUnit Platform Console Standalone jar. Its compile step is swapped for
-      -- one that waits for (and reports on) the jdtls build, utils/java_build.lua.
-      require "neotest-java"({}, { lsp_compiler = require("utils.java_build").compiler() }),
-
-      -- Python: pytest (or unittest when pytest isn't installed) from the
-      -- project's own venv, found the same way as the LSP and debugger.
-      require "neotest-python" {
-        python = function(root)
-          return require("utils.python").path(root)
-        end,
-        dap = { justMyCode = false },
-        -- pytest hides print() output from passing tests; -s lets it stream
-        -- live into Test Results (unittest never captures, and reads -s as
-        -- its start directory, so only for pytest)
-        args = function(runner)
-          return runner == "pytest" and { "-s" } or {}
-        end,
-      },
-    }),
+    adapters = vim.tbl_map(with_env_test, adapters),
 
     -- Clickable gutter buttons, see utils/test_gutter.lua
     consumers = {

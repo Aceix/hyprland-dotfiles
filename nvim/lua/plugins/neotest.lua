@@ -28,7 +28,7 @@ return {
   event = {
     {
       event = { "BufReadPost", "BufNewFile" },
-      pattern = {
+      pattern = vim.list_extend(require("langs").test_patterns(), {
         "*_test.go",
         "*.test.{js,jsx,ts,tsx,mjs,cjs,mts,cts}",
         "*.spec.{js,jsx,ts,tsx,mjs,cjs,mts,cts}",
@@ -39,7 +39,7 @@ return {
         "*IT.java",
         "test_*.py",
         "*_test.py",
-      },
+      }),
     },
   },
   keys = {

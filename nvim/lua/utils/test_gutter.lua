@@ -15,17 +15,6 @@ local sign_group = "neotest-status" -- neotest/consumers/status.lua
 ---@type table? neotest client handed to the consumer
 local client
 
--- Width of the number column, which sits to the right of the sign column
-local function number_width(win)
-  local wo = vim.wo[win]
-  if not (wo.number or wo.relativenumber) then
-    return 0
-  end
-  local buf = vim.api.nvim_win_get_buf(win)
-  local digits = #tostring(vim.api.nvim_buf_line_count(buf))
-  return math.max(wo.numberwidth, digits + 1)
-end
-
 -- The buffer line under a click on a neotest sign, or nil when the click
 -- landed anywhere else.
 local function clicked_test()
@@ -33,13 +22,8 @@ local function clicked_test()
   if m.winid == 0 or m.line == 0 or not vim.api.nvim_win_is_valid(m.winid) then
     return
   end
-  local info = vim.fn.getwininfo(m.winid)[1]
-  if
-    not info
-    or m.wincol > info.textoff - number_width(m.winid)
-    or m.wincol <= require("utils.fold_gutter").width(m.winid)
-  then
-    return -- text area, line numbers or fold chevrons
+  if require("utils.statuscolumn").lane_at(m.winid, m.wincol) ~= "glyph" then
+    return -- text area, line numbers, git bar or fold chevrons
   end
   local buf = vim.api.nvim_win_get_buf(m.winid)
   local placed = vim.fn.sign_getplaced(buf, { group = sign_group, lnum = m.line })[1]
